@@ -242,7 +242,7 @@ const MECH = { none: '', star: '⭐ Добрось до звезды!', wind: '�
 function startLevel(L) {
   G.mode = 'play'; G.L = L; G.beatT0 = G.t; gx = gxTo = GX; fls = [];
   st = { throws: LEVELS[L].throws, n: 0, hearts: 3, score: 0, combo: 0, streak: 0, perfect: 0, drops: 0, caught: 0, stars: 0 };
-  ['levels', 'result', 'home'].forEach(id => $(id).hidden = true); $('sign').hidden = true; $('hud').hidden = false;
+  ['levels', 'result', 'home', 'pass', 'board'].forEach(id => $(id).hidden = true); $('sign').hidden = true; $('hud').hidden = false;
   nextThrow(); setPhase('intro'); hud();
   const l = LEVELS[L]; $('iIcon').textContent = l.icon; $('iTitle').textContent = `${L + 1}. ${l.n}`; $('iText').textContent = l.about; $('intro').hidden = false;
 }
@@ -253,7 +253,7 @@ function nextThrow() {                                                          
 }
 function setPhase(p) { G.phase = p; phaseT0 = G.t; }
 function hud() {
-  $('hLvl').querySelector('b').textContent = LEVELS[G.L].n;
+  $('hLvl').querySelector('b').textContent = party ? `${party.players[party.i].name} · ${LEVELS[G.L].n}` : LEVELS[G.L].n;
   $('hLvl').querySelector('small').textContent = `Бросок ${Math.min(st.n + (G.phase === 'ready' || G.phase === 'charge' || G.phase === 'intro' ? 1 : 0), st.throws)} из ${st.throws} · ${'❤️'.repeat(Math.max(0, st.hearts))}${'🤍'.repeat(3 - Math.max(0, st.hearts))}`;
   $('hScore').innerHTML = `${st.score}<small>${st.combo > 1 ? `серия ×${st.combo}` : '&nbsp;'}</small>`;
 }
@@ -306,22 +306,97 @@ function afterThrow() {                                                         
   if (wasCatch && st.streak > 0 && st.streak % 3 === 0) { st.cheerTaps = 0; setPhase('cheer'); sCrowd(0.25, 2); pop('Чир-момент! Жми быстро!', W / 2, H * 0.28, '#ffc21a', 30); return; }
   setPhase('ready'); hud();
 }
+const MEDAL = { gold: '🥇', silver: '🥈', bronze: '🥉' };
 function finish() {
-  setPhase('end'); const m = TW.medal(st), L = G.L, gained = TW.stars(st.score);
+  setPhase('end'); const m = TW.medal(st), L = G.L, J = TW.judges(st);
+  if (m) { confetti(W / 2, H * 0.4, 90, 1.2); sCrowd(0.3, 2.5); [0, 4, 7, 12, 16].forEach((s, k) => bell(523.25 * Math.pow(2, s / 12), k * 0.12, 1.4, 0.1)); }
+  if (party) {                                                                       // на компанию: прогресс и звёзды не трогаем
+    const p = party.players[party.i], nx = party.players[party.i + 1]; Object.assign(p, { score: st.score, medal: m, J });
+    setTimeout(() => {
+      $('passMedal').textContent = m ? MEDAL[m] : '💪'; $('passTitle').textContent = `${p.name}: ${st.score} очков`;
+      $('passText').textContent = nx ? `Передай телефон: выступает ${nx.name}!` : 'Все выступили — смотрим итоги!';
+      $('passGo').textContent = nx ? `${nx.name}, начинай ▶` : 'Итоги турнира 🏆'; $('pass').hidden = false; showJudges($('passJudges'), J);
+    }, m ? 900 : 600);
+    return;
+  }
+  const gained = TW.stars(st.score);
   starsN += gained; best[L] = Math.max(best[L] || 0, st.score);
   const rank = { bronze: 1, silver: 2, gold: 3 }; if (m && (rank[m] > (rank[medals[L]] || 0))) medals[L] = m;
   saveAll();
-  if (m) { confetti(W / 2, H * 0.4, 90, 1.2); sCrowd(0.3, 2.5); [0, 4, 7, 12, 16].forEach((s, k) => bell(523.25 * Math.pow(2, s / 12), k * 0.12, 1.4, 0.1)); }
+  dip = null; if (m) diploma(name() || 'Звезда твирлинга', `${MEDAL[m]} ${{ gold: 'Золото', silver: 'Серебро', bronze: 'Бронза' }[m]}`, `в выступлении «${LEVELS[L].n}»`, st.score, J).then(f => { dip = f; });
   setTimeout(() => {
-    $('rMedal').textContent = m ? { gold: '🥇', silver: '🥈', bronze: '🥉' }[m] : '💪';
+    $('rMedal').textContent = m ? MEDAL[m] : '💪';
     $('rTitle').textContent = m ? { gold: 'Золото!', silver: 'Серебро!', bronze: 'Бронза!' }[m] : 'Почти получилось!';
     $('rText').innerHTML = `Очки: <b>${st.score}</b> · поймано ${st.caught}, идеально ${st.perfect}${st.stars ? `, звёзд над сценой ${st.stars}` : ''}<br>+${gained} ⭐ в копилку`
       + (m === 'gold' ? '' : m ? '<br>Для золота: без падений и половина бросков — идеально' : '<br>Попробуй бросать пониже — так легче поймать');
     const next = m && L < LEVELS.length - 1;
     $('rNext').textContent = next ? 'Следующее выступление ▶' : 'Ещё раз'; $('rNext').dataset.l = next ? L + 1 : L; $('rAgain').hidden = !next;
-    $('result').hidden = false;
+    $('rDiploma').hidden = !m; $('result').hidden = false; showJudges($('rJudges'), J);
   }, m ? 900 : 600);
 }
+// таблички судей переворачиваются по очереди
+function showJudges(el, J) {
+  el.innerHTML = J.map((v, i) => `<div><small>Судья ${i + 1}</small>${v.toFixed(1)}</div>`).join('') + `<b>Средний балл: ${(J.reduce((a, b) => a + b) / 3).toFixed(2)}</b>`;
+  el.querySelectorAll('div').forEach((d, i) => setTimeout(() => { d.classList.add('on'); bell(784 + i * 110, 0, 0.4, 0.07); }, 300 + i * 450));
+  setTimeout(() => sCrowd(0.22, 1.4), 300 + 3 * 450);
+}
+
+// ─── диплом: картинка собирается на телефоне (имя никуда не отправляется), сохранить — через «Поделиться» ───
+let dip = null;
+function diploma(who, medalLine, what, score, J) {
+  const c = document.createElement('canvas'), x = c.getContext('2d'), w = 1080, h = 1440; c.width = w; c.height = h;
+  const g = x.createRadialGradient(w / 2, h * 0.35, 50, w / 2, h / 2, h * 0.8); g.addColorStop(0, '#5b2bb0'); g.addColorStop(1, '#1a0b3d'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  x.strokeStyle = '#ffc21a'; x.lineWidth = 14; x.strokeRect(40, 40, w - 80, h - 80); x.lineWidth = 4; x.strokeRect(70, 70, w - 140, h - 140);
+  x.fillStyle = '#fff'; for (let i = 0; i < 70; i++) { const sx = (i * 397) % w, sy = (i * 211) % h; if (sx > 90 && sx < w - 90 && sy > 260 && sy < h - 120) continue; x.globalAlpha = 0.3 + (i % 5) * 0.12; x.beginPath(); x.arc(sx, sy, 2 + (i % 3), 0, 7); x.fill(); } x.globalAlpha = 1;
+  const t = (s, y, size, col = '#fff', weight = 800) => { x.font = `${weight} ${size}px -apple-system, "SF Pro Rounded", Roboto, sans-serif`; x.textAlign = 'center'; x.fillStyle = col;
+    let sz = size; while (x.measureText(s).width > w - 200 && sz > 20) { sz -= 4; x.font = `${weight} ${sz}px -apple-system, "SF Pro Rounded", Roboto, sans-serif`; } x.fillText(s, w / 2, y); };
+  x.shadowColor = 'rgba(255,194,26,.6)'; x.shadowBlur = 30; t('ДИПЛОМ', 250, 130, '#ffc21a', 900); x.shadowBlur = 0;
+  t('Звезда твирлинга', 330, 44, '#e3d6ff', 700);
+  t('награждается', 450, 40, '#c9a6ff', 600);
+  t(who, 560, 96, '#fff', 900);
+  t(medalLine, 760, 120, '#ffc21a', 900);
+  t(what, 860, 46, '#fff', 700);
+  t(`Очки: ${score}`, 960, 44, '#e3d6ff', 700);
+  t(`Оценки судей: ${J.map(v => v.toFixed(1)).join(' · ')}`, 1030, 44, '#e3d6ff', 700);
+  x.strokeStyle = '#e8eef8'; x.lineWidth = 16; x.lineCap = 'round'; x.beginPath(); x.moveTo(330, 1180); x.lineTo(750, 1110); x.stroke();
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(760, 1108, 30, 0, 7); x.fill(); x.beginPath(); x.arc(322, 1182, 24, 0, 7); x.fill();
+  t(new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }), 1290, 40, '#c9a6ff', 600);
+  t('code-by-Mazinger', 1345, 26, 'rgba(255,255,255,.5)', 700);
+  return new Promise(r => c.toBlob(b => r(new File([b], 'diplom.png', { type: 'image/png' })), 'image/png'));
+}
+function shareDip() {                                                                // файл готов заранее — «Поделиться» вызывается прямо из нажатия
+  if (!dip) return;
+  if (navigator.canShare && navigator.canShare({ files: [dip] })) navigator.share({ files: [dip], title: 'Диплом' }).catch(() => {});
+  else { const a = document.createElement('a'); a.href = URL.createObjectURL(dip); a.download = 'diplom.png'; document.body.appendChild(a); a.click(); a.remove(); }
+}
+$('rDiploma').onclick = shareDip; $('bDiploma').onclick = shareDip;
+
+// ─── на компанию: 2–4 игрока по очереди проходят одно выступление, в конце — табло ───
+let party = null;
+function partySetup() {
+  const last = lj('tw_party', []), names = [name() || last[0] || '', ...last.slice(1)];
+  $('pNames').innerHTML = [0, 1, 2, 3].map(i => `<input class="fld" maxlength="14" autocomplete="off" placeholder="Игрок ${i + 1}${i > 1 ? ' (можно пропустить)' : ''}" value="${esc(names[i] || '')}">`).join('');
+  const u0 = unlocked(); $('pLevel').innerHTML = LEVELS.map((l, i) => i <= u0 ? `<option value="${i}">${l.icon} ${i + 1}. ${l.n}</option>` : '').join('');
+  $('pErr').textContent = ''; $('partySetup').hidden = false;
+}
+$('partyBtn').onclick = () => { audio(); partySetup(); };
+$('pClose').onclick = () => { $('partySetup').hidden = true; };
+$('pStart').onclick = () => {
+  const ns = [...$('pNames').querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
+  if (ns.length < 2) { $('pErr').textContent = 'Нужно хотя бы 2 игрока'; return; }
+  ls('tw_party', JSON.stringify(ns)); party = { L: +$('pLevel').value, players: ns.map(n => ({ name: n })), i: 0 };
+  $('partySetup').hidden = true; startLevel(party.L);
+};
+$('passGo').onclick = () => { $('pass').hidden = true; party.i++; if (party.i < party.players.length) startLevel(party.L); else board(); };
+function board() {
+  const pl = [...party.players].sort((a, b) => b.score - a.score), win = pl[0];
+  const place = p => pl.filter(q => q.score > p.score).length;                       // равные очки — одно место
+  $('boardList').innerHTML = pl.map(p => `<div class="place ${place(p) ? '' : 'first'}">${['🥇', '🥈', '🥉', '🎀'][place(p)]} ${esc(p.name)}<span>${p.score}</span></div>`).join('');
+  $('board').hidden = false; confetti(W / 2, H * 0.3, 120, 1.3); sCrowd(0.3, 2.5);
+  dip = null; diploma(win.name, '🏆 1 место', `турнир на компанию · «${LEVELS[party.L].n}»`, win.score, win.J).then(f => { dip = f; });
+}
+$('bAgain').onclick = () => { $('board').hidden = true; party.i = 0; startLevel(party.L); };
+$('bHome').onclick = () => { $('board').hidden = true; home(); };
 
 // ─── касания ───
 cv.addEventListener('pointerdown', e => {
@@ -405,7 +480,7 @@ function text(s, x, y, c, size, maxW) {
 const name = () => ls('tw_name') || '';
 const today = () => { const d = new Date(); return `${d.getMonth() + 1}-${d.getDate()}`; };
 function home() {
-  G.mode = 'home'; fls = []; gx = gxTo = GX; $('hud').hidden = true; $('intro').hidden = true; $('home').hidden = false; $('sign').hidden = false;
+  party = null; G.mode = 'home'; fls = []; gx = gxTo = GX; $('hud').hidden = true; $('intro').hidden = true; $('home').hidden = false; $('sign').hidden = false;
   $('hello').textContent = name() ? `Привет, ${name()}! 💜` : '';
   $('bdayBadge').hidden = ls('tw_bday') !== today();
   $('homeStars').textContent = `⭐ ${starsN}`;

@@ -33,6 +33,11 @@ assert(TW.starHit(0.7, 0.62) && !TW.starHit(0.5, 0.7));
 assert(TW.under(100, 110, 1) && !TW.under(100, 130, 1));
 assert(TW.onBeat(1.2) && TW.onBeat(1.25) && !TW.onBeat(1.5) && TW.onBeat(0.59));
 assert(SHOP.costume.some(x => x.id === 'vstar' && x.gift) && SHOP.baton.some(x => x.id === 'amethyst') && SHOP.pompom.some(x => x.id === 'lavender'), 'фиолетовый набор');
+// судьи: чистое выступление — около 10, с падениями ниже; всегда 5.0–10.0
+const mid = () => 0.5, J = st => TW.judges(st, mid);
+assert.deepStrictEqual(J({ caught: 6, perfect: 6, drops: 0 }), [10, 10, 10]);
+assert(J({ caught: 6, perfect: 2, drops: 0 })[0] < 10 && J({ caught: 4, perfect: 2, drops: 2 })[0] < J({ caught: 6, perfect: 2, drops: 0 })[0]);
+assert(J({ caught: 0, perfect: 0, drops: 3 })[0] >= 5 && TW.judges({ caught: 6, perfect: 6, drops: 0 }).every(x => x <= 10 && x >= 5));
 // гардероб: в каждом разделе есть бесплатная вещь, цены растут, id не повторяются
 for (const [k, list] of Object.entries(SHOP)) {
   assert(list.some(x => x.price === 0), k + ': есть бесплатная');

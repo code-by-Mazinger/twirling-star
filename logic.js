@@ -37,6 +37,11 @@ function medal(st) {
   return st.drops <= 1 ? 'silver' : 'bronze';
 }
 const stars = score => Math.round(score / 100);
+// Судьи: три оценки 5.0–10.0. Качество — доля пойманных (60%) и идеальных (40%), каждое падение −0,3; судьи расходятся на ±0,2
+function judges(st, r = Math.random) {
+  const tries = Math.max(1, st.caught + st.drops), q = 0.6 * st.caught / tries + 0.4 * st.perfect / tries;
+  return [0, 1, 2].map(() => Math.round(clamp(7 + 3 * q - 0.3 * st.drops + (r() - 0.5) * 0.4, 5, 10) * 10) / 10);
+}
 // Фишки: звезда поймана, если вершина броска (доля высоты hk) рядом со звездой; ловля на ветру — только под жезлом; бросок в такт
 const starHit = (hk, target) => Math.abs(hk - target) <= 0.09;
 const under = (handX, batonX, u) => Math.abs(handX - batonX) <= 16 * u;
@@ -54,5 +59,5 @@ const SHOP = {
     { id: 'silver', n: 'Серебряные', c: ['#dfe7f2', '#ffffff'], price: 120 }],
   extra: [{ id: 'crown', n: 'Корона именинницы', price: 0, gift: true }],
 };
-globalThis.TW = { LEVELS, MIX, BEAT, flight, grade, points, medal, stars, starHit, under, onBeat, SHOP };
+globalThis.TW = { LEVELS, MIX, BEAT, flight, grade, points, medal, stars, judges, starHit, under, onBeat, SHOP };
 })();

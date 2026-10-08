@@ -68,6 +68,19 @@ button{font:inherit;color:inherit;cursor:pointer}
 .it span{margin-left:auto;font-size:14px;color:var(--gold);white-space:nowrap}
 .it.on{border-color:#ffc21a;box-shadow:0 0 14px rgba(255,194,26,.35)}
 .it.no{opacity:.55}
+.judges{display:flex;justify-content:center;gap:10px;margin:6px 0 2px;perspective:400px}
+.judges:empty{display:none}
+.judges div{width:72px;padding:8px 0 6px;border-radius:12px;background:#fff;color:#3a1680;font-weight:900;font-size:24px;box-shadow:0 6px 16px rgba(0,0,0,.35);transform:rotateX(90deg);transition:transform .45s cubic-bezier(.3,1.5,.6,1)}
+.judges div.on{transform:none}
+.judges div small{display:block;font-size:11px;font-weight:700;color:#8b5cf6}
+.judges b{display:block;width:100%;margin-top:4px;font-size:15px;color:var(--gold)}
+#pNames input{margin:6px 0;font-size:17px;padding:11px}
+select.fld{font-size:16px;-webkit-appearance:none;appearance:none}
+select.fld option{color:#000}
+.err{color:#ff9fb3;font-size:14px;min-height:18px}
+.place{display:flex;align-items:center;gap:10px;margin:6px 0;padding:11px 14px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid var(--line);font-weight:800;font-size:17px;text-align:left}
+.place span{margin-left:auto;color:var(--gold)}
+.place.first{border-color:#ffc21a;box-shadow:0 0 16px rgba(255,194,26,.35)}
 </style>
 </head>
 <body>
@@ -87,9 +100,10 @@ button{font:inherit;color:inherit;cursor:pointer}
   <div class="menu">
     <button class="go" id="playBtn">⭐ Выступать</button>
     <div class="row">
+      <button class="go soft" id="partyBtn">👯 На компанию</button>
       <button class="go soft" id="shopBtn">👗 Гардероб</button>
-      <button class="go soft" id="sndBtn"></button>
     </div>
+    <div class="row"><button class="go soft" id="sndBtn"></button></div>
   </div>
 </div>
 <div class="sign" id="sign">code-by-Mazinger</div>
@@ -125,6 +139,34 @@ button{font:inherit;color:inherit;cursor:pointer}
   <button class="go" id="giftOk">Надеть! 💜</button>
 </div></div>
 
+<div class="ovl dim" id="partySetup" hidden><div class="card">
+  <div class="big">👯</div>
+  <h2>На компанию</h2>
+  <p>От 2 до 4 игроков. Каждый выступает по очереди — у кого больше очков, тот победил!</p>
+  <div id="pNames"></div>
+  <select class="fld" id="pLevel"></select>
+  <div class="err" id="pErr"></div>
+  <button class="go" id="pStart">Начать</button>
+  <button class="go soft" id="pClose">Назад</button>
+</div></div>
+
+<div class="ovl dim" id="pass" hidden><div class="card">
+  <div class="big" id="passMedal"></div>
+  <h2 id="passTitle"></h2>
+  <div class="judges" id="passJudges"></div>
+  <p id="passText"></p>
+  <button class="go" id="passGo"></button>
+</div></div>
+
+<div class="ovl dim" id="board" hidden><div class="card">
+  <div class="big">🏆</div>
+  <h2>Итоги турнира</h2>
+  <div id="boardList"></div>
+  <button class="go" id="bDiploma">📜 Диплом победителю</button>
+  <button class="go soft" id="bAgain">Ещё раз</button>
+  <button class="go soft" id="bHome">Домой</button>
+</div></div>
+
 <div class="ovl dim" id="levels" hidden><div class="card">
   <h2>Выступления</h2>
   <div id="lvList"></div>
@@ -134,7 +176,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div class="ovl dim" id="result" hidden><div class="card">
   <div class="big" id="rMedal"></div>
   <h2 id="rTitle"></h2>
+  <div class="judges" id="rJudges"></div>
   <p id="rText"></p>
+  <button class="go" id="rDiploma" hidden>📜 Диплом</button>
   <button class="go" id="rNext"></button>
   <button class="go soft" id="rAgain">Ещё раз</button>
   <button class="go soft" id="rHome">Домой</button>
