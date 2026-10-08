@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1a0b3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Твирлинг">
+<title>Звезда твирлинга</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--pink:#ff4f9a;--violet:#7c4dff;--gold:#ffc21a;--ink:#fff;--ink2:#e3d6ff;--glass:rgba(30,12,70,.62);--line:rgba(255,255,255,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#1a0b3d;color:var(--ink);font-family:-apple-system,"SF Pro Rounded","Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+#cv{position:fixed;inset:0;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer}
+/* игровая панель */
+#hud{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 8px) 12px 0;display:flex;align-items:flex-start;gap:8px;pointer-events:none;z-index:2}
+#hud[hidden]{display:none}
+#hud .box{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:7px 12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#hLvl{flex:1;min-width:0}
+#hLvl b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hLvl small{font-size:12px;color:var(--ink2)}
+#hScore{text-align:right;font-weight:800;font-size:20px;min-width:84px}
+#hScore small{display:block;font-size:13px;font-weight:600}
+#hHome{pointer-events:auto;width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--glass);font-size:20px;flex:none}
+/* окна */
+.ovl{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;z-index:5}
+.ovl[hidden]{display:none}
+.ovl.dim{background:rgba(15,5,40,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.card{width:min(420px,94vw);max-height:90vh;overflow:auto;border-radius:28px;background:linear-gradient(170deg,rgba(60,22,120,.93),rgba(30,10,70,.95));border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 40px rgba(255,79,154,.25);padding:22px;text-align:center}
+.card h2{margin:0 0 8px;font-size:24px}
+.card p{margin:8px 0;line-height:1.45;color:var(--ink2)}
+.go{display:block;width:100%;margin-top:12px;padding:15px;border:0;border-radius:20px;background:linear-gradient(90deg,#ff4f9a,#ff8a3d);color:#fff;font-size:19px;font-weight:800;box-shadow:0 0 24px rgba(255,79,154,.5),inset 0 1px 0 rgba(255,255,255,.4)}
+.go:active{transform:scale(.97)}
+.go.soft{background:rgba(255,255,255,.1);border:1px solid var(--line);box-shadow:none;font-size:16px;font-weight:700}
+.fld{display:block;width:100%;margin:10px 0;padding:14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:20px;text-align:center;-webkit-user-select:text;user-select:text}
+.big{font-size:64px;line-height:1.1;margin:4px 0}
+/* главный экран — поверх сцены */
+#home{position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top) + 18px) 18px 0;pointer-events:none}
+#home[hidden]{display:none}
+#home>*{pointer-events:auto}
+#home h1{margin:0;font-size:clamp(30px,9vw,42px);font-weight:900;text-align:center;line-height:1.05;background:linear-gradient(90deg,#ffd6ec,#ff4f9a 45%,#ffc21a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 10px rgba(255,79,154,.5))}
+#hello{margin:6px 0 2px;font-size:17px;font-weight:700;color:#fff;text-align:center}
+#bdayBadge{margin-top:4px;padding:5px 12px;border-radius:999px;background:linear-gradient(90deg,#ff4f9a,#ffc21a);font-weight:800;font-size:14px;color:#2a0b3d}
+#bdayBadge[hidden]{display:none}
+#homeStars{margin-top:8px;font-size:16px;font-weight:800;color:var(--gold)}
+.menu{width:min(100%,380px);margin-top:12px}
+.row{display:flex;gap:8px}.row .go{flex:1;font-size:16px;padding:13px 8px}
+.sign{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 6px);text-align:center;font-size:12px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.55);pointer-events:none;z-index:4}
+/* уровни */
+.lv{display:flex;align-items:center;gap:10px;width:100%;margin:6px 0;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.08);text-align:left;font-size:16px;font-weight:700}
+.lv span{margin-left:auto;font-size:22px}
+.lv:disabled{opacity:.4}
+.lv small{display:block;font-weight:500;font-size:12px;color:var(--ink2)}
+/* гардероб — сверху, чтобы внизу была видна девочка */
+#shop{align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 12px)}
+#shop .card{max-height:56vh}
+.tabs{display:flex;gap:6px;margin:4px 0 10px}
+.tabs button{flex:1;padding:9px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:700;font-size:14px}
+.tabs button.on{background:linear-gradient(90deg,#ff4f9a,#7c4dff);border-color:transparent}
+.it{display:flex;align-items:center;gap:10px;width:100%;margin:5px 0;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.07);text-align:left;font-weight:700;font-size:15px}
+.it i{width:30px;height:30px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.6)}
+.it span{margin-left:auto;font-size:14px;color:var(--gold);white-space:nowrap}
+.it.on{border-color:#ffc21a;box-shadow:0 0 14px rgba(255,194,26,.35)}
+.it.no{opacity:.55}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud" hidden>
+  <button id="hHome" aria-label="Домой">🏠</button>
+  <div class="box" id="hLvl"><b></b><small></small></div>
+  <div class="box" id="hScore"></div>
+</div>
+
+<div id="home">
+  <h1>Звезда твирлинга</h1>
+  <div id="hello"></div>
+  <div id="bdayBadge" hidden>🎂 С днём рождения!</div>
+  <div id="homeStars"></div>
+  <div class="menu">
+    <button class="go" id="playBtn">⭐ Выступать</button>
+    <div class="row">
+      <button class="go soft" id="shopBtn">👗 Гардероб</button>
+      <button class="go soft" id="sndBtn"></button>
+    </div>
+  </div>
+</div>
+<div class="sign" id="sign">code-by-Mazinger</div>
+
+<div class="ovl dim" id="nameCard" hidden><div class="card">
+  <div class="big">🌟</div>
+  <h2>Привет, звезда!</h2>
+  <p>Как тебя зовут?</p>
+  <input class="fld" id="nameIn" maxlength="16" placeholder="Твоё имя" autocomplete="off">
+  <button class="go" id="nameOk">Готово</button>
+</div></div>
+
+<div class="ovl dim" id="bday" hidden><div class="card">
+  <div class="big">🎂</div>
+  <h2 id="bdayTitle"></h2>
+  <p>Тебе 10 лет — это настоящий юбилей! Пусть каждый бросок будет точным, а каждое выступление — золотым! 🏅</p>
+  <p><b>Подарок:</b> 👑 корона именинницы и ✨ золотой жезл — уже в гардеробе.</p>
+  <button class="go" id="bdayOk">Ура! 🎉</button>
+</div></div>
+
+<div class="ovl dim" id="levels" hidden><div class="card">
+  <h2>Выступления</h2>
+  <div id="lvList"></div>
+  <button class="go soft" id="lvClose">Назад</button>
+</div></div>
+
+<div class="ovl dim" id="result" hidden><div class="card">
+  <div class="big" id="rMedal"></div>
+  <h2 id="rTitle"></h2>
+  <p id="rText"></p>
+  <button class="go" id="rNext"></button>
+  <button class="go soft" id="rAgain">Ещё раз</button>
+  <button class="go soft" id="rHome">Домой</button>
+</div></div>
+
+<div class="ovl" id="shop" hidden><div class="card">
+  <h2>Гардероб</h2>
+  <div id="shopStars"></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="items"></div>
+  <button class="go soft" id="shopClose">Готово</button>
+</div></div>
+
+<script src="logic.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
