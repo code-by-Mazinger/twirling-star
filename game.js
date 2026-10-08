@@ -59,49 +59,114 @@ const unlocked = () => Math.min(LEVELS.length - 1, Object.keys(medals).length ? 
 
 // ─── сцена ───
 const cv = $('cv'), cx = cv.getContext('2d');
-let W = 0, H = 0, groundY = 0, u = 1, GX = 0;
+let W = 0, H = 0, groundY = 0, u = 1, GX = 0, gx = 0, crowd = [], flakes = [], skyStars = [];
 function resize() {
   const dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
   cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px'; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  groundY = H * 0.86; u = Math.min(H * 0.32, W * 0.7) / 100; GX = W / 2;
-  crowd = Array.from({ length: Math.ceil(W / 18) * 3 }, (_, i) => ({ x: (i % Math.ceil(W / 18)) * 18 + rnd(-4, 4), row: Math.floor(i / Math.ceil(W / 18)), c: `hsl(${rnd(0, 360)},60%,${rnd(55, 75)}%)`, ph: rnd(0, 6) }));
+  groundY = H * 0.86; u = Math.min(H * 0.32, W * 0.7) / 100; GX = gx = W / 2;
+  const n = Math.ceil(W / 18);
+  crowd = Array.from({ length: n * 3 }, (_, i) => ({ x: (i % n) * 18 + rnd(-4, 4), row: Math.floor(i / n), c: `hsl(${rnd(0, 360)},65%,${rnd(55, 75)}%)`, ph: rnd(0, 6) }));
+  flakes = Array.from({ length: 50 }, () => ({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 3), v: rnd(20, 50), ph: rnd(0, 6) }));
+  skyStars = Array.from({ length: 70 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.4), r: rnd(0.5, 1.6), ph: rnd(0, 6) }));
 }
-let crowd = [];
 addEventListener('resize', resize);
-const hand = () => ({ x: GX + 18 * u, y: groundY - 93 * u });                       // правая рука, поднятая для ловли
+const hand = () => ({ x: gx + 18 * u, y: groundY - 93 * u });                       // правая рука, поднятая для ловли
 
 // игра: phase — ready (ждёт касания), charge (держит палец), fly, catch, drop, cheer, end; home — главный экран
-const G = { mode: 'home', phase: 'ready', L: 0, t: 0 };
+const G = { mode: 'home', phase: 'ready', L: 0, t: 0, cur: 'none', wind: 0, star: 0, beatT0: 0 };
 const pops = [], parts = [];
 function pop(text, x, y, color = '#fff', size = 30) { pops.push({ text, x, y, color, size, t0: G.t }); }
 function confetti(x, y, n = 40, spread = 1) {
-  const cols = ['#ff4f9a', '#ffc21a', '#7c4dff', '#3fd6ff', '#5fe3a1', '#ffffff'];
+  const cols = ['#9b5cff', '#ff4f9a', '#ffc21a', '#c9a6ff', '#3fd6ff', '#ffffff'];
   for (let i = 0; i < n; i++) parts.push({ x, y, vx: rnd(-260, 260) * spread, vy: rnd(-520, -160) * spread, r: rnd(0, 6), vr: rnd(-8, 8), c: cols[i % cols.length], w: rnd(5, 9), h: rnd(3, 6), life: rnd(1.4, 2.4), t0: G.t });
 }
-function sparkle(x, y, n = 14) { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; parts.push({ x, y, vx: Math.cos(a) * rnd(120, 220), vy: Math.sin(a) * rnd(120, 220), star: true, c: '#fff6b0', life: 0.6, t0: G.t, r: 0, vr: 0, w: 4, h: 4 }); } }
+function sparkle(x, y, n = 14, c = '#fff6b0') { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; parts.push({ x, y, vx: Math.cos(a) * rnd(120, 220), vy: Math.sin(a) * rnd(120, 220), star: true, c, life: 0.6, t0: G.t, r: 0, vr: 0, w: 4, h: 4 }); } }
+function firework() { const x = rnd(W * 0.15, W * 0.85), y = rnd(H * 0.08, H * 0.3), c = `hsl(${rnd(0, 360)},90%,65%)`;
+  for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2, v = rnd(70, 130); parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, star: true, c, life: 1.2, t0: G.t, r: 0, vr: 0, w: 3, h: 3, fw: true }); } }
 
-function background() {
-  const hue = G.mode === 'play' ? LEVELS[G.L].hue : 285;
-  const g = cx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, `hsl(${hue},70%,12%)`); g.addColorStop(0.55, `hsl(${hue + 20},65%,22%)`); g.addColorStop(1, `hsl(${hue + 30},60%,10%)`);
-  cx.fillStyle = g; cx.fillRect(0, 0, W, H);
-  // трибуны — силуэты зрителей, при чир-моменте прыгают
-  const hype = G.phase === 'cheer' ? 1 : 0.25;
-  for (const p of crowd) { const y = groundY - 60 * u - p.row * 22 - 40 + Math.max(0, Math.sin(G.t * 6 + p.ph)) * 6 * hype;
-    cx.fillStyle = `rgba(0,0,0,${0.55 - p.row * 0.12})`; cx.beginPath(); cx.arc(p.x, y, 8, 0, 7); cx.fill(); cx.fillRect(p.x - 9, y + 6, 18, 30);
-    if (G.phase === 'cheer' && p.row === 0) { cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x + 9, y - 14 - Math.sin(G.t * 12 + p.ph) * 6, 4, 0, 7); cx.fill(); } }
-  // прожекторы
+// общие части сцен
+const hype = () => G.phase === 'cheer' ? 1 : G.phase === 'end' ? 0.8 : 0.25;
+function stands(y0, alpha = 0.55, color = '0,0,0') {                               // зрители: силуэты, при чир-моменте прыгают и машут
+  const h = hype(), clap = G.mode === 'play' && G.cur === 'beat' && (G.phase === 'ready' || G.phase === 'charge') && TW.onBeat(G.t - G.beatT0);
+  for (const p of crowd) { const y = y0 - p.row * 22 + Math.max(0, Math.sin(G.t * 6 + p.ph)) * 6 * h;
+    cx.fillStyle = `rgba(${color},${alpha - p.row * 0.12})`; cx.beginPath(); cx.arc(p.x, y, 8, 0, 7); cx.fill(); cx.fillRect(p.x - 9, y + 6, 18, 30);
+    if ((G.phase === 'cheer' || G.phase === 'end' || clap) && p.row === 0) { cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x + 9, y - 14 - Math.sin(G.t * 12 + p.ph) * 6, 4, 0, 7); cx.fill(); } }
+}
+function spots(cols, alpha = 0.32) {
   cx.save(); cx.globalCompositeOperation = 'lighter';
-  for (const [sx, ph, col] of [[W * 0.1, 0, '255,120,200'], [W * 0.9, 2, '120,180,255'], [W * 0.5, 4, '255,220,140']]) {
-    const tx = GX + Math.sin(G.t * 0.7 + ph) * W * 0.35, gr = cx.createLinearGradient(sx, 0, tx, groundY);
-    gr.addColorStop(0, `rgba(${col},.32)`); gr.addColorStop(1, `rgba(${col},0)`); cx.fillStyle = gr;
-    cx.beginPath(); cx.moveTo(sx - 8, 0); cx.lineTo(sx + 8, 0); cx.lineTo(tx + 70, groundY); cx.lineTo(tx - 70, groundY); cx.closePath(); cx.fill();
-  }
+  cols.forEach((col, i) => { const sx = W * (0.1 + 0.8 * i / Math.max(1, cols.length - 1)), tx = GX + Math.sin(G.t * 0.7 + i * 2) * W * 0.35, gr = cx.createLinearGradient(sx, 0, tx, groundY);
+    gr.addColorStop(0, `rgba(${col},${alpha})`); gr.addColorStop(1, `rgba(${col},0)`); cx.fillStyle = gr;
+    cx.beginPath(); cx.moveTo(sx - 8, 0); cx.lineTo(sx + 8, 0); cx.lineTo(tx + 70, groundY); cx.lineTo(tx - 70, groundY); cx.closePath(); cx.fill(); });
   cx.restore();
-  // ковёр-сцена и пятно света под девочкой
-  const fg = cx.createLinearGradient(0, groundY, 0, H); fg.addColorStop(0, `hsl(${hue + 330},55%,30%)`); fg.addColorStop(1, `hsl(${hue + 330},50%,14%)`);
-  cx.fillStyle = fg; cx.fillRect(0, groundY, W, H - groundY);
-  const sp = cx.createRadialGradient(GX, groundY + 6, 4, GX, groundY + 6, 90 * u); sp.addColorStop(0, 'rgba(255,240,255,.45)'); sp.addColorStop(1, 'rgba(255,240,255,0)');
+}
+function vgrad(stops, y0 = 0, y1 = H) { const g = cx.createLinearGradient(0, y0, 0, y1); stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c)); return g; }
+function floor(stops) { cx.fillStyle = vgrad(stops, groundY, H); cx.fillRect(0, groundY, W, H - groundY); }
+function arena(top, mid, bot, spotCols, floorCols) {
+  cx.fillStyle = vgrad([top, mid, bot]); cx.fillRect(0, 0, W, H);
+  stands(groundY - 100 * u); spots(spotCols); floor(floorCols);
+}
+
+const SCENES = {
+  home: () => arena('#1b0840', '#3d1680', '#14062e', ['200,140,255', '255,120,220', '170,120,255'], ['#5a2aa8', '#2a0f5c']),
+  gym() {                                                                             // спортзал: окна, шведские стенки, мат
+    cx.fillStyle = vgrad(['#efe0c6', '#e0c9a4']); cx.fillRect(0, 0, W, groundY);
+    for (let i = 0; i < 4; i++) { const x = W * (0.08 + i * 0.23), w = W * 0.17, y = H * 0.06, h = H * 0.2;
+      cx.fillStyle = '#bfe3ff'; cx.fillRect(x, y, w, h); cx.strokeStyle = '#fff'; cx.lineWidth = 4; cx.strokeRect(x, y, w, h); cx.beginPath(); cx.moveTo(x + w / 2, y); cx.lineTo(x + w / 2, y + h); cx.moveTo(x, y + h / 2); cx.lineTo(x + w, y + h / 2); cx.stroke(); }
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = 'rgba(255,250,220,.12)';
+    for (let i = 0; i < 4; i++) { const x = W * (0.08 + i * 0.23); cx.beginPath(); cx.moveTo(x, H * 0.26); cx.lineTo(x + W * 0.17, H * 0.26); cx.lineTo(x + W * 0.3, groundY); cx.lineTo(x + W * 0.1, groundY); cx.fill(); } cx.restore();
+    for (const x0 of [W * 0.02, W * 0.8]) { const w = W * 0.18, y0 = H * 0.34; cx.fillStyle = '#a8743f';
+      for (const px of [0, w / 2, w]) cx.fillRect(x0 + px - 3, y0, 6, groundY - y0);
+      for (let y = y0 + 12; y < groundY; y += 22) cx.fillRect(x0, y, w, 4); }
+    cx.fillStyle = '#7c4dff'; cx.font = `900 ${Math.round(W * 0.06)}px -apple-system,sans-serif`; cx.textAlign = 'center'; cx.fillText('ТРЕНИРОВКА', W / 2, H * 0.32);
+    floor(['#c98f55', '#a8703c']); cx.strokeStyle = 'rgba(90,50,20,.25)'; cx.lineWidth = 1; for (let y = groundY + 10; y < H; y += 14) { cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke(); }
+    cx.fillStyle = '#8a5cff'; cx.beginPath(); cx.ellipse(GX, groundY + 8, 70 * u, 9 * u, 0, 0, 7); cx.fill();
+  },
+  school() {                                                                          // школьная сцена: занавес, гирлянда, дети в зале
+    cx.fillStyle = vgrad(['#2a0d52', '#4a1a7c']); cx.fillRect(0, 0, W, groundY);
+    for (const [x0, dir] of [[0, 1], [W, -1]]) for (let i = 0; i < 6; i++) { cx.fillStyle = i % 2 ? '#8e1f6d' : '#a8287f'; cx.fillRect(x0 + dir * i * W * 0.035 - (dir < 0 ? W * 0.035 : 0), 0, W * 0.035, groundY); }
+    cx.fillStyle = '#7a1660'; for (let x = 0; x < W; x += 40) { cx.beginPath(); cx.arc(x + 20, H * 0.03, 22, 0, Math.PI); cx.fill(); } cx.fillRect(0, 0, W, H * 0.03);
+    cx.strokeStyle = '#3b2a1a'; cx.lineWidth = 2; cx.beginPath(); for (let x = 0; x <= W; x += 6) { const y = H * 0.1 + Math.sin(x / W * Math.PI) * H * 0.05; x ? cx.lineTo(x, y) : cx.moveTo(x, y); } cx.stroke();
+    for (let x = 15, k = 0; x < W; x += 28, k++) { const y = H * 0.1 + Math.sin(x / W * Math.PI) * H * 0.05 + 6, on = Math.sin(G.t * 3 + k) > -0.3;
+      cx.fillStyle = on ? ['#ff5fa8', '#ffc21a', '#5fe3a1', '#5f9dff', '#c9a6ff'][k % 5] : 'rgba(255,255,255,.2)'; cx.beginPath(); cx.arc(x, y, 5, 0, 7); cx.fill(); }
+    spots(['255,200,240', '200,160,255'], 0.25);
+    floor(['#8a5a32', '#5c3a1e']);
+    for (let i = 0; i < Math.ceil(W / 26); i++) { cx.fillStyle = 'rgba(10,0,25,.85)'; const x = i * 26 + 13, y = H - 14 + Math.sin(G.t * 5 + i) * 2 * hype() * 4; cx.beginPath(); cx.arc(x, y, 11, 0, 7); cx.fill(); }
+  },
+  stadium() {                                                                         // стадион на закате: трибуны, прожекторы, флаги по ветру
+    cx.fillStyle = vgrad(['#ff9a5a', '#d0569f', '#4a1b8c'], 0, H * 0.5); cx.fillRect(0, 0, W, H);
+    cx.fillStyle = '#ffd08a'; cx.beginPath(); cx.arc(W * 0.75, H * 0.36, 34, 0, 7); cx.fill();
+    cx.fillStyle = '#2a1050'; cx.beginPath(); cx.moveTo(0, H * 0.4); cx.lineTo(W, H * 0.4); cx.lineTo(W, groundY); cx.lineTo(0, groundY); cx.fill();
+    stands(groundY - 100 * u, 0.6, '20,5,45');
+    for (let i = 0; i < 60; i++) { cx.fillStyle = `hsla(${i * 47 % 360},70%,65%,.7)`; cx.fillRect((i * 97) % W, H * 0.42 + (i * 31) % (H * 0.12), 3, 3); }
+    for (const x of [W * 0.06, W * 0.94]) { cx.fillStyle = '#1a0a33'; cx.fillRect(x - 3, H * 0.12, 6, H * 0.3); cx.fillStyle = '#fff6d0'; cx.fillRect(x - 16, H * 0.1, 32, 12);
+      cx.save(); cx.globalCompositeOperation = 'lighter'; const g = cx.createRadialGradient(x, H * 0.11, 2, x, H * 0.11, 90); g.addColorStop(0, 'rgba(255,240,200,.6)'); g.addColorStop(1, 'rgba(255,240,200,0)'); cx.fillStyle = g; cx.fillRect(x - 90, H * 0.11 - 90, 180, 180); cx.restore(); }
+    const wd = Math.sign(G.wind || 1), ws = Math.min(1, Math.abs(G.wind) / (40 * u) + 0.3);       // флаги показывают ветер
+    for (const [x, c] of [[W * 0.25, '#ff5fa8'], [W * 0.5, '#ffc21a'], [W * 0.75, '#5fe3a1']]) { const y = H * 0.36; cx.fillStyle = '#ddd'; cx.fillRect(x - 1.5, y, 3, H * 0.06);
+      cx.fillStyle = c; cx.beginPath(); cx.moveTo(x, y); for (let k = 0; k <= 6; k++) cx.lineTo(x + wd * k * 6 * ws * 1.4, y + Math.sin(G.t * 8 + k) * 2 * ws); for (let k = 6; k >= 0; k--) cx.lineTo(x + wd * k * 6 * ws * 1.4, y + 14 + Math.sin(G.t * 8 + k) * 2 * ws); cx.fill(); }
+    floor(['#b8473c', '#7e2a24']); cx.strokeStyle = 'rgba(255,255,255,.6)'; cx.lineWidth = 2; for (const k of [0.25, 0.55, 0.85]) { cx.beginPath(); cx.moveTo(0, groundY + (H - groundY) * k); cx.lineTo(W, groundY + (H - groundY) * k); cx.stroke(); }
+  },
+  palace: () => arena('#0a1a3d', '#163a7a', '#081530', ['120,180,255', '200,140,255', '255,220,160'], ['#2a5aa8', '#0f2a5c']),
+  russia() {                                                                          // арена Кубка: ленты-растяжки бело-сине-красные
+    arena('#1a0c3a', '#2c1a6a', '#120830', ['255,230,200', '200,170,255', '255,200,220'], ['#4a2a8a', '#1e0f4a']);
+    for (let i = 0; i < 9; i++) { const x = W * (i + 0.5) / 9, l = H * (0.16 + 0.05 * Math.sin(i * 1.7)); ['#ffffff', '#2f6bff', '#ff3b4a'].forEach((c, k) => { cx.fillStyle = c; cx.fillRect(x - 9 + k * 6, 0, 6, l - k * 6); }); }
+  },
+  ice() {                                                                             // ледовый дворец: голубой лёд, снежинки
+    arena('#06203d', '#1d5a96', '#0a2a4a', ['200,240,255', '170,200,255', '230,250,255'], ['#cfeeff', '#7fb8e6']);
+    cx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 6; i++) { cx.fillRect(W * (i * 0.17 + 0.03), groundY + 6 + i * 5, W * 0.12, 2); }
+    cx.fillStyle = '#fff'; for (const f of flakes) { const y = (f.y + G.t * f.v) % H, x = f.x + Math.sin(G.t + f.ph) * 10; cx.globalAlpha = 0.7; cx.beginPath(); cx.arc(x, y, f.r, 0, 7); cx.fill(); } cx.globalAlpha = 1;
+  },
+  world() {                                                                           // финал: ночное небо, фейерверки, флажки
+    cx.fillStyle = vgrad(['#05021a', '#1d0a4a', '#3a1680'], 0, groundY); cx.fillRect(0, 0, W, H);
+    cx.fillStyle = '#fff'; for (const s of skyStars) { cx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(G.t * 2 + s.ph)); cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 7); cx.fill(); } cx.globalAlpha = 1;
+    stands(groundY - 100 * u, 0.7, '15,5,40'); spots(['200,140,255', '255,210,120', '255,120,220'], 0.36);
+    cx.strokeStyle = 'rgba(255,255,255,.5)'; cx.lineWidth = 1.5; cx.beginPath(); for (let x = 0; x <= W; x += 6) { const y = H * 0.05 + Math.sin(x / W * Math.PI) * H * 0.04; x ? cx.lineTo(x, y) : cx.moveTo(x, y); } cx.stroke();
+    for (let x = 10, k = 0; x < W; x += 22, k++) { const y = H * 0.05 + Math.sin(x / W * Math.PI) * H * 0.04; cx.fillStyle = `hsl(${k * 40 % 360},85%,60%)`; cx.beginPath(); cx.moveTo(x - 8, y); cx.lineTo(x + 8, y); cx.lineTo(x, y + 16); cx.fill(); }
+    floor(['#6a2bd9', '#2a0f5c']);
+  },
+};
+function background() {
+  SCENES[G.mode === 'play' ? LEVELS[G.L].scene : 'home']();
+  const sp = cx.createRadialGradient(GX, groundY + 6, 4, GX, groundY + 6, 90 * u); sp.addColorStop(0, 'rgba(255,240,255,.4)'); sp.addColorStop(1, 'rgba(255,240,255,0)');
   cx.fillStyle = sp; cx.beginPath(); cx.ellipse(GX, groundY + 6, 90 * u, 14 * u, 0, 0, 7); cx.fill();
 }
 
@@ -117,7 +182,7 @@ function arm(x0, y0, x1, y1) { cx.strokeStyle = SKIN; cx.lineWidth = 4.6 * u; cx
   cx.fillStyle = SKIN; cx.beginPath(); cx.arc(x1 * u, y1 * u, 2.9 * u, 0, 7); cx.fill(); }
 function girl(P) {
   const co = item('costume'), [c1, c2] = co.c, pc = item('pompom').c, t = G.t;
-  cx.save(); cx.translate(GX, groundY - (P.jump || 0) * u + (P.squat || 0) * u);
+  cx.save(); cx.translate(gx, groundY - (P.jump || 0) * u + (P.squat || 0) * u); if (P.flip !== undefined) cx.scale(P.flip, 1);
   // ноги и сапожки
   cx.fillStyle = SKIN; rr(-8.5 * u, -36 * u, 6 * u, 30 * u, 3 * u); cx.fill(); rr(2.5 * u, -36 * u, 6 * u, 30 * u, 3 * u); cx.fill();
   cx.fillStyle = '#fff'; rr(-9.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill(); rr(1.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill();
@@ -160,7 +225,7 @@ function girl(P) {
 function baton(x, y, a, alpha = 1) {
   const b = item('baton'), L = 21 * u;
   cx.save(); cx.globalAlpha = alpha; cx.translate(x, y); cx.rotate(a);
-  if (b.glow) { cx.shadowColor = '#38e8ff'; cx.shadowBlur = 16; }
+  if (b.glow) { cx.shadowColor = b.glow; cx.shadowBlur = 16; }
   let gr = cx.createLinearGradient(-L, 0, L, 0);
   if (b.rainbow) ['#ff5f6d', '#ffc371', '#5fe3a1', '#5f9dff', '#b16bff'].forEach((c, i) => gr.addColorStop(i / 4, c)); else { gr.addColorStop(0, b.c[0]); gr.addColorStop(0.5, b.c[1]); gr.addColorStop(1, b.c[0]); }
   cx.strokeStyle = gr; cx.lineWidth = 2.6 * u; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(-L, 0); cx.lineTo(L, 0); cx.stroke();
@@ -168,42 +233,77 @@ function baton(x, y, a, alpha = 1) {
   cx.restore();
 }
 
+
 // ─── игра ───
-let fl = null, chargeT0 = 0, phaseT0 = 0, st = null, tutor = !ls('tw_tut');
+// fls — жезлы в воздухе (на «двух жезлах» их два): T, h, spins, t0, a0, x0, dx (снос ветром), done, dropAt, trick, beat
+let fls = [], chargeT0 = 0, phaseT0 = 0, st = null, tutor = !ls('tw_tut'), gxTo = 0, spinT0 = -9;
+const MECH = { none: '', star: '⭐ Добрось до звезды!', wind: '🌬️ Ветер! Нажми, куда падает жезл, — и беги', double: '✌️ Два жезла — поймай оба',
+  trick: '🌀 Пока жезл высоко — нажми для пируэта', beat: '👏 Отпусти палец на хлопок' };
 function startLevel(L) {
-  G.mode = 'play'; G.L = L; st = { throws: LEVELS[L].throws, n: 0, hearts: 3, score: 0, combo: 0, streak: 0, perfect: 0, drops: 0, caught: 0 };
-  setPhase('ready'); $('home').hidden = true; $('sign').hidden = true; $('hud').hidden = false; ['levels', 'result'].forEach(id => $(id).hidden = true); hud();
+  G.mode = 'play'; G.L = L; G.beatT0 = G.t; gx = gxTo = GX; fls = [];
+  st = { throws: LEVELS[L].throws, n: 0, hearts: 3, score: 0, combo: 0, streak: 0, perfect: 0, drops: 0, caught: 0, stars: 0 };
+  ['levels', 'result', 'home'].forEach(id => $(id).hidden = true); $('sign').hidden = true; $('hud').hidden = false;
+  nextThrow(); setPhase('intro'); hud();
+  const l = LEVELS[L]; $('iIcon').textContent = l.icon; $('iTitle').textContent = `${L + 1}. ${l.n}`; $('iText').textContent = l.about; $('intro').hidden = false;
+}
+$('iGo').onclick = () => { $('intro').hidden = true; audio(); setPhase('ready'); };
+function nextThrow() {                                                               // фишка этого броска: звезда на высоте, сила ветра
+  const m = LEVELS[G.L].mech; G.cur = m === 'mix' ? TW.MIX[Math.floor(Math.random() * TW.MIX.length)] : m;
+  G.star = rnd(0.45, 0.95); G.wind = G.cur === 'wind' ? (Math.random() < 0.5 ? -1 : 1) * rnd(22, 42) * u : 0; gxTo = GX;
 }
 function setPhase(p) { G.phase = p; phaseT0 = G.t; }
 function hud() {
   $('hLvl').querySelector('b').textContent = LEVELS[G.L].n;
-  $('hLvl').querySelector('small').textContent = `Бросок ${Math.min(st.n + (G.phase === 'ready' || G.phase === 'charge' ? 1 : 0), st.throws)} из ${st.throws} · ${'❤️'.repeat(st.hearts)}${'🤍'.repeat(3 - st.hearts)}`;
+  $('hLvl').querySelector('small').textContent = `Бросок ${Math.min(st.n + (G.phase === 'ready' || G.phase === 'charge' || G.phase === 'intro' ? 1 : 0), st.throws)} из ${st.throws} · ${'❤️'.repeat(Math.max(0, st.hearts))}${'🤍'.repeat(3 - Math.max(0, st.hearts))}`;
   $('hScore').innerHTML = `${st.score}<small>${st.combo > 1 ? `серия ×${st.combo}` : '&nbsp;'}</small>`;
 }
+const hmax = () => hand().y - H * 0.13;
 function throwIt() {
-  const power = Math.min(1, (G.t - chargeT0) / 0.9), f = TW.flight(power, G.L), h = hand();
-  fl = { ...f, h: (h.y - H * 0.13) * f.hk, t0: G.t, a0: (G.t * 9) % (Math.PI * 2), x: h.x }; st.n++; sWhoosh(power); setPhase('fly'); hud();
+  const power = Math.min(1, (G.t - chargeT0) / 0.9), f = TW.flight(power, G.L), h = hand(), beat = G.cur === 'beat' && TW.onBeat(G.t - G.beatT0);
+  const one = (ff, hk, extra = {}) => ({ ...ff, hk, h: hmax() * hk, t0: G.t, a0: (G.t * 9) % (Math.PI * 2), x0: h.x, dx: G.wind, done: false, beat, ...extra });
+  fls = [one(f, f.hk)];
+  if (G.cur === 'double') { const T2 = f.T * 1.35; fls.push(one({ ...f, T: T2, spins: Math.max(1, Math.round(LEVELS[G.L].spin * T2)) }, Math.min(1, f.hk * 1.25), { a0: 1.2 })); }
+  if (G.cur === 'star') fls[0].starCheck = true;
+  if (beat) pop('В такт! 👏', h.x, h.y - 40 * u, '#c9a6ff', 26); else if (G.cur === 'beat') pop('Мимо такта', h.x, h.y - 40 * u, '#ddd', 18);
+  st.n++; sWhoosh(power); setPhase('fly'); hud();
 }
-function tryCatch() {
-  const e = G.t - fl.t0 - fl.T, [, gw] = LEVELS[G.L].win;
-  if (e < -0.4) { pop('Ещё рано!', W / 2, H * 0.3, '#ffd6ec', 22); return; }      // случайное касание в начале полёта не считается
-  const g = TW.grade(e, G.L);
-  if (g === 'miss') { drop(e < 0 ? 'Рано!' : 'Поздно!'); return; }
-  const h = hand(), pts = TW.points(fl.spins, g, st.combo);
-  st.score += pts; st.combo++; st.streak++; st.caught++; if (g === 'perfect') st.perfect++;
-  pop(g === 'perfect' ? 'Идеально!' : 'Хорошо!', h.x, h.y - 50 * u, g === 'perfect' ? '#ffe066' : '#9ff3e3', g === 'perfect' ? 34 : 28);
-  pop(`+${pts} · ${fl.spins} ${fl.spins === 1 ? 'оборот' : fl.spins < 5 ? 'оборота' : 'оборотов'}`, h.x, h.y - 25 * u, '#fff', 18);
+const bx = f => f.x0 + f.dx * Math.min((G.t - f.t0) / f.T, 1.3);                   // жезл сносит ветром (упавший дальше не едет)
+function tap(x) {
+  const live = fls.filter(f => !f.done), [, gw] = LEVELS[G.L].win;
+  const near = live.map(f => ({ f, e: G.t - f.t0 - f.T })).filter(o => o.e > -0.4).sort((a, b) => Math.abs(a.e) - Math.abs(b.e))[0];
+  const runTo = () => { gxTo = Math.max(30 * u, Math.min(W - 40 * u, x - 18 * u)); };
+  if (!near) {                                                                        // жезл ещё высоко: пируэт, бег под жезл или «ещё рано»
+    const s = live.length ? (G.t - live[0].t0) / live[0].T : 0;
+    if (G.cur === 'trick' && !live[0].trick && s > 0.08 && s < 0.75) { live.forEach(f => f.trick = true); spinT0 = G.t; noise(0.4, 800, 3000, 0.15); pop('Пируэт! 🌀', gx, groundY - 110 * u, '#c9a6ff', 26); return; }
+    if (G.cur === 'wind') { runTo(); return; }
+    pop('Ещё рано!', W / 2, H * 0.3, '#e6d9ff', 22); return;
+  }
+  const f = near.f, h = hand();
+  if (G.cur === 'wind' && !TW.under(h.x, bx(f), u) && Math.abs(near.e) <= gw) { runTo(); return; }   // не под жезлом — сначала добеги
+  const g = TW.grade(near.e, G.L);
+  if (g === 'miss') { if (G.cur === 'wind' && near.e < 0) { runTo(); return; } drop(f, near.e < 0 ? 'Рано!' : 'Поздно!'); return; }
+  const mult = (f.trick ? 2 : 1) * (f.beat ? 1.5 : 1), pts = Math.round(TW.points(f.spins, g, st.combo) * mult);
+  st.score += pts; st.combo++; st.caught++; if (g === 'perfect') st.perfect++;
+  pop(g === 'perfect' ? 'Идеально!' : 'Хорошо!', h.x, h.y - 50 * u, g === 'perfect' ? '#ffe066' : '#c9a6ff', g === 'perfect' ? 34 : 28);
+  pop(`+${pts}${mult > 1 ? ` (×${mult})` : ''} · ${f.spins} ${f.spins === 1 ? 'оборот' : f.spins < 5 ? 'оборота' : 'оборотов'}`, h.x, h.y - 25 * u, '#fff', 18);
   sCatch(g); sparkle(h.x, h.y); if (g === 'perfect') confetti(h.x, h.y, 16, 0.6);
-  fl = null; setPhase('catch'); hud();
+  f.done = true; f.ok = true; resolve();
   if (tutor) { tutor = false; ls('tw_tut', 1); }
 }
-function drop(why) {
-  st.hearts--; st.drops++; st.combo = 0; st.streak = 0; sDrop(); pop(why + ' Уронила…', W / 2, H * 0.32, '#ff9fb3', 26);
-  fl.dropAt = G.t; setPhase('drop'); hud();
+function drop(f, why) {
+  st.hearts--; st.drops++; st.combo = 0; sDrop(); pop(why + ' Уронила…', W / 2, H * 0.32, '#ff9fb3', 26);
+  f.done = true; f.dropAt = G.t; resolve();
+}
+function resolve() {                                                                 // бросок закончен, когда все жезлы пойманы или упали
+  hud(); if (fls.some(f => !f.done)) return;
+  const ok = fls.every(f => f.ok); if (ok) st.streak = Math.max(0, st.streak) + 1; else st.streak = 0;
+  setPhase(ok ? 'catch' : 'drop');
 }
 function afterThrow() {                                                              // что дальше: чир-момент, следующий бросок или конец
+  const wasCatch = G.phase === 'catch'; fls = [];
   if (st.hearts <= 0 || st.n >= st.throws) return finish();
-  if (G.phase === 'catch' && st.streak > 0 && st.streak % 3 === 0) { st.cheerTaps = 0; setPhase('cheer'); sCrowd(0.25, 2); pop('Чир-момент! Жми быстро!', W / 2, H * 0.28, '#ffc21a', 30); return; }
+  nextThrow();
+  if (wasCatch && st.streak > 0 && st.streak % 3 === 0) { st.cheerTaps = 0; setPhase('cheer'); sCrowd(0.25, 2); pop('Чир-момент! Жми быстро!', W / 2, H * 0.28, '#ffc21a', 30); return; }
   setPhase('ready'); hud();
 }
 function finish() {
@@ -215,7 +315,8 @@ function finish() {
   setTimeout(() => {
     $('rMedal').textContent = m ? { gold: '🥇', silver: '🥈', bronze: '🥉' }[m] : '💪';
     $('rTitle').textContent = m ? { gold: 'Золото!', silver: 'Серебро!', bronze: 'Бронза!' }[m] : 'Почти получилось!';
-    $('rText').innerHTML = `Очки: <b>${st.score}</b> · поймано ${st.caught} из ${st.n}, идеально ${st.perfect}<br>+${gained} ⭐ в копилку` + (m === 'gold' ? '' : m ? '<br>Для золота: без падений и половина бросков — идеально' : '<br>Попробуй бросать пониже — так легче поймать');
+    $('rText').innerHTML = `Очки: <b>${st.score}</b> · поймано ${st.caught}, идеально ${st.perfect}${st.stars ? `, звёзд над сценой ${st.stars}` : ''}<br>+${gained} ⭐ в копилку`
+      + (m === 'gold' ? '' : m ? '<br>Для золота: без падений и половина бросков — идеально' : '<br>Попробуй бросать пониже — так легче поймать');
     const next = m && L < LEVELS.length - 1;
     $('rNext').textContent = next ? 'Следующее выступление ▶' : 'Ещё раз'; $('rNext').dataset.l = next ? L + 1 : L; $('rAgain').hidden = !next;
     $('result').hidden = false;
@@ -226,49 +327,68 @@ function finish() {
 cv.addEventListener('pointerdown', e => {
   if (G.mode !== 'play') return; e.preventDefault();
   if (G.phase === 'ready') { chargeT0 = G.t; setPhase('charge'); }
-  else if (G.phase === 'fly') tryCatch();
-  else if (G.phase === 'cheer') { st.cheerTaps++; st.score += 30; sShake(); if (st.cheerTaps % 5 === 0) sparkle(GX + rnd(-60, 60), groundY - rnd(60, 110) * u, 6); hud(); }
+  else if (G.phase === 'fly') tap(e.clientX);
+  else if (G.phase === 'cheer') { st.cheerTaps++; st.score += 30; sShake(); if (st.cheerTaps % 5 === 0) sparkle(gx + rnd(-60, 60), groundY - rnd(60, 110) * u, 6); hud(); }
 });
 addEventListener('pointerup', () => { if (G.mode === 'play' && G.phase === 'charge') throwIt(); });
 addEventListener('pointercancel', () => { if (G.mode === 'play' && G.phase === 'charge') throwIt(); });
 
 // ─── кадр ───
-let last = performance.now();
+let last = performance.now(), lastBeat = 0, fwT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; G.t += dt;
+  if (G.mode === 'play' && LEVELS[G.L].scene === 'world' && G.t > fwT) { firework(); fwT = G.t + 1.3; }
+  // хлопки зала на «ритме»
+  if (G.mode === 'play' && G.cur === 'beat' && (G.phase === 'ready' || G.phase === 'charge')) { const b = Math.floor((G.t - G.beatT0) / TW.BEAT); if (b !== lastBeat) { lastBeat = b; noise(0.08, 1500, 2500, 0.2); } }
+  gx += Math.sign(gxTo - gx) * Math.min(Math.abs(gxTo - gx), 420 * dt);              // бег под жезл
   background();
-  const h = hand(); let pose = { arm: 1 }, bx = h.x, by = h.y, ba = G.t * 9, showBaton = true;
-  if (G.mode === 'home') { pose = { arm: 1, jump: Math.max(0, Math.sin(G.t * 2.4)) * 3, happy: Math.sin(G.t * 0.5) > 0.6 }; ba = G.t * 7; }
-  else if (G.phase === 'charge') { const p = Math.min(1, (G.t - chargeT0) / 0.9); ba = G.t * (9 + 25 * p); pose = { arm: 1, squat: 3 * p }; }
+  const h = hand(); let pose = { arm: 1 }, showBaton = true, inHand = true;
+  if (G.mode === 'home') pose = { arm: 1, jump: Math.max(0, Math.sin(G.t * 2.4)) * 3, happy: Math.sin(G.t * 0.5) > 0.6 };
+  else if (G.phase === 'charge') pose = { arm: 1, squat: 3 * Math.min(1, (G.t - chargeT0) / 0.9) };
   else if (G.phase === 'fly' || G.phase === 'drop') {
-    const s = (G.t - fl.t0) / fl.T; let hy = fl.h * 4 * s * (1 - s);
-    by = h.y - hy; ba = fl.a0 + Math.PI * 2 * fl.spins * s;
-    if (G.phase === 'fly' && G.t - fl.t0 > fl.T + LEVELS[G.L].win[1]) drop('Поздно!');
-    if (by > groundY - 3 * u) { by = groundY - 3 * u + Math.abs(Math.sin((G.t - fl.dropAt) * 12)) * -8 * Math.max(0, 1 - (G.t - fl.dropAt)); ba = 0.15; }
-    for (const k of [1, 2]) baton(bx, by + k * 6, ba - k * 0.35, 0.18);              // след вращения
-    pose = G.phase === 'drop' ? { arm: 0.6, sad: true } : { arm: Math.min(1, s * 1.5) };
+    inHand = false; const [, gw] = LEVELS[G.L].win;
+    for (const f of fls) {
+      const s = (G.t - f.t0) / f.T, x = bx(f); let y = h.y - f.h * 4 * s * (1 - s), a = f.a0 + Math.PI * 2 * f.spins * s;
+      if (f.starCheck && s >= 0.5) { f.starCheck = false; if (TW.starHit(f.hk, G.star)) { st.stars++; st.score += 250; sparkle(x, hand().y - hmax() * G.star, 18, '#ffe066'); bell(1318.5, 0, 0.8, 0.1); pop('Звезда! +250', x, hand().y - hmax() * G.star + 30, '#ffe066', 24); hud(); } else pop(f.hk < G.star ? 'Выше!' : 'Ниже!', x + 40, hand().y - hmax() * G.star, '#fff', 18); }
+      if (!f.done && G.t - f.t0 > f.T + gw) drop(f, 'Поздно!');
+      if (f.ok) continue;                                                            // пойманный — в руке
+      if (y > groundY - 3 * u) { y = groundY - 3 * u - Math.abs(Math.sin((G.t - (f.dropAt || G.t)) * 12)) * 8 * Math.max(0, 1 - (G.t - (f.dropAt || G.t))); a = 0.15; }
+      else for (const k of [1, 2]) baton(x, y + k * 6, a - k * 0.35, 0.18);          // след вращения
+      baton(x, y, a);
+    }
+    inHand = fls.some(f => f.ok);
+    const s0 = fls[0] ? (G.t - fls[0].t0) / fls[0].T : 1;
+    pose = G.phase === 'drop' ? { arm: 0.6, sad: true } : { arm: Math.min(1, s0 * 1.5) };
     if (G.phase === 'drop' && G.t - phaseT0 > 1.1) afterThrow();
   }
   else if (G.phase === 'catch') { const k = G.t - phaseT0; pose = { arm: 1, squat: Math.sin(Math.min(1, k / 0.4) * Math.PI) * 3, happy: true }; if (k > 0.5) afterThrow(); }
   else if (G.phase === 'cheer') { showBaton = false; pose = { cheer: true, jump: Math.abs(Math.sin(G.t * 9)) * 6, happy: true }; if (G.t - phaseT0 > 4) { pop(`+${st.cheerTaps * 30} за помпоны!`, W / 2, H * 0.3, '#ffc21a', 26); setPhase('ready'); hud(); } }
   else if (G.phase === 'end') pose = { arm: 1, jump: Math.abs(Math.sin(G.t * 5)) * 4, happy: true };
+  if (G.t - spinT0 < 0.6) { pose.flip = Math.cos((G.t - spinT0) / 0.6 * Math.PI * 4); pose.jump = (pose.jump || 0) + Math.sin((G.t - spinT0) / 0.6 * Math.PI) * 10; }
+  // звезда над сценой
+  if (G.mode === 'play' && G.cur === 'star' && ['ready', 'charge', 'fly'].includes(G.phase)) { const sy = hand().y - hmax() * G.star; text('⭐', hand().x, sy, '#fff', 30); cx.setLineDash([4, 6]); cx.strokeStyle = 'rgba(255,224,102,.35)'; cx.beginPath(); cx.moveTo(hand().x - 40, sy); cx.lineTo(hand().x + 40, sy); cx.stroke(); cx.setLineDash([]); }
   girl(pose);
-  if (showBaton) baton(bx, by, ba);
-  // круг ловли и сила броска
-  if (G.mode === 'play' && (G.phase === 'fly' || G.phase === 'charge' || G.phase === 'ready')) {
-    const s = fl ? (G.t - fl.t0 - fl.T) : -9, near = Math.abs(s) <= LEVELS[G.L].win[1];
+  if (showBaton && inHand) baton(hand().x, hand().y, G.phase === 'charge' ? G.t * (9 + 25 * Math.min(1, (G.t - chargeT0) / 0.9)) : G.t * (G.mode === 'home' ? 7 : 9));
+  // круг ловли, сила броска, такт
+  if (G.mode === 'play' && ['fly', 'charge', 'ready'].includes(G.phase)) {
+    const hh = hand(), near = fls.some(f => !f.done && Math.abs(G.t - f.t0 - f.T) <= LEVELS[G.L].win[1]);
     cx.strokeStyle = near ? 'rgba(255,224,102,.95)' : `rgba(255,255,255,${G.phase === 'fly' ? 0.35 + 0.25 * Math.sin(G.t * 10) : 0.25})`;
-    cx.lineWidth = near ? 5 : 3; cx.beginPath(); cx.arc(h.x, h.y, 17 * u, 0, 7); cx.stroke();
-    if (G.phase === 'charge') { const p = Math.min(1, (G.t - chargeT0) / 0.9); cx.strokeStyle = `hsl(${120 - 120 * p},90%,60%)`; cx.lineWidth = 7; cx.beginPath(); cx.arc(h.x, h.y, 24 * u, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); cx.stroke(); }
+    cx.lineWidth = near ? 5 : 3; cx.beginPath(); cx.arc(hh.x, hh.y, 17 * u, 0, 7); cx.stroke();
+    if (G.phase === 'charge') { const p = Math.min(1, (G.t - chargeT0) / 0.9); cx.strokeStyle = `hsl(${280 - 60 * p},90%,65%)`; cx.lineWidth = 7; cx.beginPath(); cx.arc(hh.x, hh.y, 24 * u, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); cx.stroke(); }
+    if (G.cur === 'beat' && G.phase !== 'fly') { const ph = ((G.t - G.beatT0) % TW.BEAT) / TW.BEAT, k = Math.max(0, 1 - ph * 3); cx.strokeStyle = `rgba(201,166,255,${0.25 + 0.7 * k})`; cx.lineWidth = 3 + 5 * k; cx.beginPath(); cx.ellipse(gx, groundY + 4, (40 + 25 * k) * u, (7 + 4 * k) * u, 0, 0, 7); cx.stroke(); }
+    if (G.cur === 'wind' && G.phase !== 'fly') text(G.wind > 0 ? '🌬️ ➜' : '⬅ 🌬️', W / 2, H * 0.22, '#fff', 26);
   }
   if (G.mode === 'play' && G.phase === 'cheer') { const k = 1 - (G.t - phaseT0) / 4; cx.fillStyle = 'rgba(255,255,255,.2)'; cx.fillRect(W * 0.15, H * 0.2, W * 0.7, 10); cx.fillStyle = '#ffc21a'; cx.fillRect(W * 0.15, H * 0.2, W * 0.7 * k, 10);
     text(`${st.cheerTaps}`, W / 2, H * 0.2 + 52, '#fff', 40); }
-  if (G.mode === 'play' && tutor && (G.phase === 'ready' || G.phase === 'charge')) text('Держи палец на экране — это сила броска. Отпусти — бросок!', W / 2, H * 0.36, '#fff', 17, W * 0.85);
+  if (G.mode === 'play' && (G.phase === 'ready' || G.phase === 'charge')) {
+    if (MECH[G.cur]) text((LEVELS[G.L].mech === 'mix' ? 'Сейчас: ' : '') + MECH[G.cur], W / 2, H * 0.16, '#e6d9ff', 16, W * 0.9);
+    if (tutor) text('Держи палец на экране — это сила броска. Отпусти — бросок!', W / 2, H * 0.36, '#fff', 17, W * 0.85);
+  }
   if (G.mode === 'play' && tutor && G.phase === 'fly') text('Нажми, когда жезл упадёт в круг!', W / 2, H * 0.36, '#ffe066', 19, W * 0.85);
   // частицы и надписи
   for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i], k = G.t - p.t0; if (k > p.life) { parts.splice(i, 1); continue; }
-    const x = p.x + p.vx * k, y = p.y + p.vy * k + (p.star ? 0 : 700 * k * k); cx.globalAlpha = Math.max(0, 1 - k / p.life); cx.fillStyle = p.c;
-    if (p.star) { cx.beginPath(); cx.arc(x, y, 3, 0, 7); cx.fill(); } else { cx.save(); cx.translate(x, y); cx.rotate(p.r + p.vr * k); cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cx.restore(); } }
+    const x = p.x + p.vx * k, y = p.y + p.vy * k + (p.star ? (p.fw ? 40 * k * k : 0) : 700 * k * k); cx.globalAlpha = Math.max(0, 1 - k / p.life); cx.fillStyle = p.c;
+    if (p.star) { cx.beginPath(); cx.arc(x, y, p.fw ? 2.5 : 3, 0, 7); cx.fill(); } else { cx.save(); cx.translate(x, y); cx.rotate(p.r + p.vr * k); cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cx.restore(); } }
   cx.globalAlpha = 1;
   for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i], k = G.t - p.t0; if (k > 1.2) { pops.splice(i, 1); continue; }
     cx.globalAlpha = Math.min(1, 2.4 - k * 2); text(p.text, p.x, p.y - k * 40, p.color, p.size * (k < 0.12 ? 0.7 + k * 2.5 : 1)); cx.globalAlpha = 1; }
@@ -285,15 +405,15 @@ function text(s, x, y, c, size, maxW) {
 const name = () => ls('tw_name') || '';
 const today = () => { const d = new Date(); return `${d.getMonth() + 1}-${d.getDate()}`; };
 function home() {
-  G.mode = 'home'; fl = null; $('hud').hidden = true; $('home').hidden = false; $('sign').hidden = false;
-  $('hello').textContent = name() ? `Привет, ${name()}! 🌟` : '';
+  G.mode = 'home'; fls = []; gx = gxTo = GX; $('hud').hidden = true; $('intro').hidden = true; $('home').hidden = false; $('sign').hidden = false;
+  $('hello').textContent = name() ? `Привет, ${name()}! 💜` : '';
   $('bdayBadge').hidden = ls('tw_bday') !== today();
   $('homeStars').textContent = `⭐ ${starsN}`;
   $('sndBtn').textContent = soundOn() ? '🔊 Звук' : '🔇 Без звука';
 }
 function levels() {
   const u0 = unlocked();
-  $('lvList').innerHTML = LEVELS.map((l, i) => `<button class="lv" data-l="${i}" ${i > u0 ? 'disabled' : ''}><div>${i + 1}. ${l.n}<small>${l.throws} бросков${best[i] ? ` · рекорд ${best[i]}` : ''}</small></div><span>${i > u0 ? '🔒' : { gold: '🥇', silver: '🥈', bronze: '🥉' }[medals[i]] || '▶'}</span></button>`).join('');
+  $('lvList').innerHTML = LEVELS.map((l, i) => `<button class="lv" data-l="${i}" ${i > u0 ? 'disabled' : ''}><div>${l.icon} ${i + 1}. ${l.n}<small>${l.throws} бросков${best[i] ? ` · рекорд ${best[i]}` : ''}</small></div><span>${i > u0 ? '🔒' : { gold: '🥇', silver: '🥈', bronze: '🥉' }[medals[i]] || '▶'}</span></button>`).join('');
   $('levels').hidden = false;
 }
 $('lvList').onclick = e => { const b = e.target.closest('.lv'); if (b && !b.disabled) { audio(); startLevel(+b.dataset.l); } };
@@ -311,35 +431,41 @@ const TABS = { costume: '👗 Костюм', baton: '🪄 Жезл', pompom: '�
 function shop() {
   $('shopStars').innerHTML = `<p>У тебя ⭐ ${starsN}</p>`;
   $('tabs').innerHTML = Object.entries(TABS).map(([k, n]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('');
-  $('items').innerHTML = SHOP[tab].map(x => { const has = owned[tab].includes(x.id), on = wear[tab] === x.id;
+  $('items').innerHTML = SHOP[tab].map(x => { const has = owned[tab].includes(x.id) || x.gift, on = wear[tab] === x.id;
     const sw = x.id === 'crown' ? 'background:linear-gradient(#ffe27a,#f0a800)' : x.rainbow || x.c?.length > 2 ? 'background:linear-gradient(90deg,#ff5f6d,#ffc371,#5fe3a1,#5f9dff,#b16bff)' : `background:linear-gradient(135deg,${x.c[0]},${x.c[x.c.length - 1]})`;
-    return `<button class="it ${on ? 'on' : ''} ${!has && x.price > starsN ? 'no' : ''}" data-i="${x.id}"><i style="${sw}"></i>${esc(x.n)}<span>${on ? 'надето ✓' : has ? 'надеть' : x.gift ? '🎁 подарок' : `⭐ ${x.price}`}</span></button>`; }).join('');
+    return `<button class="it ${on ? 'on' : ''} ${!has && x.price > starsN ? 'no' : ''}" data-i="${x.id}"><i style="${sw}"></i>${esc(x.n)}<span>${on ? 'надето ✓' : has ? (x.gift && !owned[tab].includes(x.id) ? '🎁 подарок' : 'надеть') : `⭐ ${x.price}`}</span></button>`; }).join('');
   $('shop').hidden = false; $('home').hidden = true;
 }
 $('tabs').onclick = e => { const b = e.target.closest('button'); if (b) { tab = b.dataset.t; shop(); } };
 $('items').onclick = e => {
-  const b = e.target.closest('.it'); if (!b) return; const x = SHOP[tab].find(i => i.id === b.dataset.i), has = owned[tab].includes(x.id);
-  if (!has) { if (x.gift || x.price > starsN) return; starsN -= x.price; owned[tab].push(x.id); bell(880, 0, 0.6, 0.1); }
+  const b = e.target.closest('.it'); if (!b) return; const x = SHOP[tab].find(i => i.id === b.dataset.i);
+  if (!owned[tab].includes(x.id)) { if (!x.gift && x.price > starsN) return; if (!x.gift) { starsN -= x.price; bell(880, 0, 0.6, 0.1); } owned[tab].push(x.id); }
   wear[tab] = tab === 'extra' && wear.extra === x.id ? '' : x.id; saveAll(); shop();                // корону можно снять
 };
 $('shopBtn').onclick = () => { audio(); shop(); };
 $('shopClose').onclick = () => { $('shop').hidden = true; home(); };
 
-// ─── первый запуск: имя и поздравление (имя хранится только на телефоне) ───
+// ─── подарки: имя и поздравление при первом запуске (имя хранится только на телефоне), фиолетовый набор ───
+function violet() {                                                                  // любимый цвет — фиолетовый: костюм, жезл, помпоны
+  for (const [k, id] of [['costume', 'vstar'], ['baton', 'amethyst'], ['pompom', 'lavender']]) { if (!owned[k].includes(id)) owned[k].push(id); wear[k] = id; }
+  ls('tw_violet', 1); saveAll();
+}
 function birthday() {
   for (const k of ['baton', 'extra']) { const id = k === 'baton' ? 'gold' : 'crown'; if (!owned[k].includes(id)) owned[k].push(id); }
-  wear.baton = 'gold'; wear.extra = 'crown'; saveAll();
+  wear.extra = 'crown'; violet();
   $('bdayTitle').textContent = name() ? `С днём рождения, ${name()}!` : 'С днём рождения!';
   $('bday').hidden = false; audio(); sBirthday(); confetti(W / 2, H * 0.3, 120, 1.3);
 }
 $('nameOk').onclick = () => { const n = $('nameIn').value.trim().slice(0, 16); ls('tw_name', n); ls('tw_bday', today()); ls('tw_bdayShown', String(new Date().getFullYear()) + today()); $('nameCard').hidden = true; home(); birthday(); };
 $('bdayOk').onclick = () => { $('bday').hidden = true; confetti(W / 2, H * 0.4, 60); home(); };
+$('giftOk').onclick = () => { $('gift').hidden = true; violet(); confetti(W / 2, H * 0.4, 80); bell(783.99, 0, 1, 0.1); home(); };
 
 resize(); home();
 if (!ls('tw_bday')) $('nameCard').hidden = false;
 else if (ls('tw_bday') === today() && ls('tw_bdayShown') !== String(new Date().getFullYear()) + today()) { ls('tw_bdayShown', String(new Date().getFullYear()) + today()); setTimeout(birthday, 400); }
+else if (!ls('tw_violet')) setTimeout(() => { $('gift').hidden = false; }, 500);
 requestAnimationFrame(frame);
-if (/[?&]debug/.test(location.search)) window.TT = { G, st: () => st, fl: () => fl, startLevel, tryCatch, throwIt, chargeAt: t => { chargeT0 = t; } };
+if (/[?&]debug/.test(location.search)) window.TT = { G, st: () => st, fls: () => fls, startLevel, tap, hand, gx: () => gx, frame };
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const had = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then(reg => document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); })).catch(() => {});

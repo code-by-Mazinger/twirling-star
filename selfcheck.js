@@ -26,6 +26,13 @@ assert.strictEqual(medal({ throws: 6, perfect: 6, drops: 1 }), 'silver');
 assert.strictEqual(medal({ throws: 6, perfect: 0, drops: 2 }), 'bronze');
 assert.strictEqual(medal({ throws: 6, perfect: 0, drops: 3 }), null);
 assert.strictEqual(stars(2549), 25);
+// фишки: у каждого выступления своя сцена; звезда, ветер, ритм
+assert.strictEqual(new Set(LEVELS.map(l => l.scene)).size, LEVELS.length, 'сцены не повторяются');
+assert(LEVELS.every(l => l.about && l.icon) && LEVELS[LEVELS.length - 1].mech === 'mix');
+assert(TW.starHit(0.7, 0.62) && !TW.starHit(0.5, 0.7));
+assert(TW.under(100, 110, 1) && !TW.under(100, 130, 1));
+assert(TW.onBeat(1.2) && TW.onBeat(1.25) && !TW.onBeat(1.5) && TW.onBeat(0.59));
+assert(SHOP.costume.some(x => x.id === 'vstar' && x.gift) && SHOP.baton.some(x => x.id === 'amethyst') && SHOP.pompom.some(x => x.id === 'lavender'), 'фиолетовый набор');
 // гардероб: в каждом разделе есть бесплатная вещь, цены растут, id не повторяются
 for (const [k, list] of Object.entries(SHOP)) {
   assert(list.some(x => x.price === 0), k + ': есть бесплатная');
