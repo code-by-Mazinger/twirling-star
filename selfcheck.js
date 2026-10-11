@@ -44,4 +44,8 @@ for (const [k, list] of Object.entries(SHOP)) {
   const paid = list.filter(x => !x.gift).map(x => x.price); assert(paid.every((p, i) => !i || p >= paid[i - 1]), k + ': цены по возрастанию');
   assert.strictEqual(new Set(list.map(x => x.id)).size, list.length, k + ': id без повторов');
 }
+// мальчик: оба героя бесплатны, у мальчика верх и низ с цветами, разделы гардероба с картинкой-значком
+assert.deepStrictEqual(SHOP.hero.map(x => x.id), ['girl', 'boy']); assert(SHOP.hero.every(x => x.price === 0));
+for (const k of ['btop', 'bbottom', 'beyes', 'bhead']) assert(SHOP[k].every(x => x.e && x.c && x.c.length === 2), k + ': значок и цвета');
+assert(SHOP.bbottom.some(x => x.id === 'swim') && SHOP.btop.some(x => x.id === 'jacket') && SHOP.beyes.some(x => x.id === 'glasses'), 'плавки, пиджак, очки');
 console.log('ВСЁ ОК');

@@ -54,6 +54,9 @@ let owned = lj('tw_owned', { costume: ['pink'], baton: ['silver'], pompom: ['pin
 let wear = lj('tw_wear', { costume: 'pink', baton: 'silver', pompom: 'pink', extra: '' });
 let starsN = +ls('tw_stars') || 0, medals = lj('tw_medals', {}), best = lj('tw_best', {});
 const saveAll = () => { ls('tw_owned', JSON.stringify(owned)); ls('tw_wear', JSON.stringify(wear)); ls('tw_stars', starsN); ls('tw_medals', JSON.stringify(medals)); ls('tw_best', JSON.stringify(best)); };
+for (const k of Object.keys(SHOP)) { owned[k] = owned[k] || []; SHOP[k].forEach(x => { if (x.price === 0 && !x.gift && !owned[k].includes(x.id)) owned[k].push(x.id); }); }
+wear = Object.assign({ hero: 'girl', btop: 'tee', bbottom: 'shorts', beyes: '', bhead: '' }, wear);   // у тех, кто играл до мальчика
+const OPTIONAL = ['extra', 'beyes', 'bhead'];                                         // это можно снять
 const item = k => SHOP[k].find(x => x.id === wear[k]) || SHOP[k][0];
 const unlocked = () => Math.min(LEVELS.length - 1, Object.keys(medals).length ? Math.max(...Object.keys(medals).map(Number)) + 1 : 0);
 
@@ -178,14 +181,19 @@ function pompom(x, y, cols, shake) {
     cx.beginPath(); cx.arc(x + Math.cos(a + shake) * d * u, y + Math.sin(a + shake) * d * u, 3.2 * u, 0, 7); cx.fill(); }
   cx.fillStyle = 'rgba(255,255,255,.55)'; cx.beginPath(); cx.arc(x - 2 * u, y - 2.5 * u, 1.6 * u, 0, 7); cx.fill();
 }
-function arm(x0, y0, x1, y1) { cx.strokeStyle = SKIN; cx.lineWidth = 4.6 * u; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(x0 * u, y0 * u); cx.lineTo(x1 * u, y1 * u); cx.stroke();
+function arm(x0, y0, x1, y1, sl) { cx.strokeStyle = SKIN; cx.lineWidth = 4.6 * u; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(x0 * u, y0 * u); cx.lineTo(x1 * u, y1 * u); cx.stroke();
+  if (sl) { const f = sl.long ? 0.82 : 0.3; cx.strokeStyle = sl.c; cx.lineWidth = 5.6 * u; cx.beginPath(); cx.moveTo(x0 * u, y0 * u); cx.lineTo((x0 + (x1 - x0) * f) * u, (y0 + (y1 - y0) * f) * u); cx.stroke(); }   // рукав мальчика
   cx.fillStyle = SKIN; cx.beginPath(); cx.arc(x1 * u, y1 * u, 2.9 * u, 0, 7); cx.fill(); }
-function girl(P) {
-  const co = item('costume'), [c1, c2] = co.c, pc = item('pompom').c, t = G.t;
+function girl(P) {                                                                   // герой: девочка или мальчик (wear.hero) — движения общие, одежда и причёска свои
+  const boy = wear.hero === 'boy', co = item('costume'), [c1, c2] = co.c, pc = item('pompom').c, t = G.t;
+  const top = item('btop'), bot = item('bbottom'), sl = boy ? { c: top.c[0], long: top.long } : null;
   cx.save(); cx.translate(gx, groundY - (P.jump || 0) * u + (P.squat || 0) * u); if (P.flip !== undefined) cx.scale(P.flip, 1);
-  // ноги и сапожки
-  cx.fillStyle = SKIN; rr(-8.5 * u, -36 * u, 6 * u, 30 * u, 3 * u); cx.fill(); rr(2.5 * u, -36 * u, 6 * u, 30 * u, 3 * u); cx.fill();
-  cx.fillStyle = '#fff'; rr(-9.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill(); rr(1.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill();
+  // ноги и сапожки (у мальчика — кеды)
+  cx.fillStyle = SKIN; rr(-8.5 * u, (boy ? -44 : -36) * u, 6 * u, (boy ? 38 : 30) * u, 3 * u); cx.fill(); rr(2.5 * u, (boy ? -44 : -36) * u, 6 * u, (boy ? 38 : 30) * u, 3 * u); cx.fill();
+  cx.fillStyle = '#fff'; if (boy) { rr(-10.5 * u, -7 * u, 9 * u, 7 * u, 3 * u); cx.fill(); rr(1.5 * u, -7 * u, 9 * u, 7 * u, 3 * u); cx.fill(); cx.fillStyle = '#e63946'; cx.fillRect(-10.5 * u, -2 * u, 9 * u, 2 * u); cx.fillRect(1.5 * u, -2 * u, 9 * u, 2 * u); }
+  else { rr(-9.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill(); rr(1.5 * u, -10 * u, 8 * u, 10 * u, 3 * u); cx.fill(); }
+  if (boy) boyClothes(top, bot);
+  else {
   // костюм: купальник с юбочкой
   let fill; if (co.rainbow) { fill = cx.createLinearGradient(-18 * u, 0, 18 * u, 0); ['#ff5f6d', '#ffc371', '#5fe3a1', '#5f9dff', '#b16bff'].forEach((c, i) => fill.addColorStop(i / 4, c)); }
   else { fill = cx.createLinearGradient(0, -64 * u, 0, -32 * u); fill.addColorStop(0, c2); fill.addColorStop(1, c1); }
@@ -194,33 +202,65 @@ function girl(P) {
   cx.strokeStyle = 'rgba(255,255,255,.5)'; cx.lineWidth = 1.2 * u; cx.beginPath(); cx.moveTo(-11 * u, -45 * u); cx.lineTo(11 * u, -45 * u); cx.stroke();
   cx.fillStyle = 'rgba(255,255,255,.9)';                                              // блёстки
   for (let i = 0; i < (co.sparkle || co.rainbow ? 9 : 5); i++) { const sx = Math.sin(i * 7.3) * 12, sy = -40 - (i * 13 % 20); if (Math.sin(t * 5 + i) > 0.2) { cx.beginPath(); cx.arc(sx * u, sy * u, 0.9 * u, 0, 7); cx.fill(); } }
+  }
   // руки: левая с помпоном; правая — ловит жезл (P.arm: 0 — внизу, 1 — вверх)
   const shake = P.cheer ? Math.sin(t * 30) * 0.6 : Math.sin(t * 2) * 0.15;
   const lh = P.cheer ? [-20 + Math.sin(t * 22) * 2, -90] : [-21, -44 + Math.sin(t * 2.2) * 1];
-  arm(-9, -60, lh[0], lh[1]); pompom(lh[0] * u, lh[1] * u, pc, shake);
+  arm(-9, -60, lh[0], lh[1], sl); pompom(lh[0] * u, lh[1] * u, pc, shake);
   const a = P.arm ?? 1, rx = 20 - 2 * a, ry = -44 - 49 * a;
-  arm(9, -60, P.cheer ? 20 + Math.sin(t * 22 + 1) * 2 : rx, P.cheer ? -90 : ry);
+  arm(9, -60, P.cheer ? 20 + Math.sin(t * 22 + 1) * 2 : rx, P.cheer ? -90 : ry, sl);
   if (P.cheer) pompom((20 + Math.sin(t * 22 + 1) * 2) * u, -90 * u, pc, -shake);
   // шея, волосы, голова
   cx.fillStyle = SKIN; rr(-2.5 * u, -67 * u, 5 * u, 6 * u, 2 * u); cx.fill();
-  cx.fillStyle = HAIR; cx.beginPath(); cx.ellipse(0, -78 * u, 14 * u, 14.5 * u, 0, 0, 7); cx.fill();
-  const sw = Math.sin(t * 4 + (P.jump || 0) * 0.2) * 0.25;                            // хвост качается
-  cx.save(); cx.translate(5 * u, -90 * u); cx.rotate(0.5 + sw); cx.beginPath(); cx.ellipse(8 * u, 0, 10 * u, 4.5 * u, 0.2, 0, 7); cx.fill(); cx.restore();
+  cx.fillStyle = HAIR; cx.beginPath(); cx.ellipse(0, -78 * u, (boy ? 13 : 14) * u, (boy ? 12.5 : 14.5) * u, 0, 0, 7); cx.fill();
+  if (!boy) { const sw = Math.sin(t * 4 + (P.jump || 0) * 0.2) * 0.25;                // хвост качается
+    cx.save(); cx.translate(5 * u, -90 * u); cx.rotate(0.5 + sw); cx.beginPath(); cx.ellipse(8 * u, 0, 10 * u, 4.5 * u, 0.2, 0, 7); cx.fill(); cx.restore(); }
   cx.fillStyle = SKIN; cx.beginPath(); cx.arc(0, -76 * u, 12 * u, 0, 7); cx.fill();
-  cx.fillStyle = HAIR; cx.beginPath(); cx.moveTo(-12.5 * u, -78 * u); cx.quadraticCurveTo(-11 * u, -92 * u, 0, -91 * u); cx.quadraticCurveTo(11 * u, -92 * u, 12.5 * u, -78 * u);
-  cx.quadraticCurveTo(6 * u, -86 * u, -2 * u, -83 * u); cx.quadraticCurveTo(-8 * u, -84 * u, -12.5 * u, -78 * u); cx.fill();
-  cx.fillStyle = c1; cx.beginPath(); cx.ellipse(3 * u, -91 * u, 4 * u, 2.4 * u, -0.4, 0, 7); cx.ellipse(9 * u, -93 * u, 4 * u, 2.4 * u, 0.4, 0, 7); cx.fill();   // бантик
+  cx.fillStyle = HAIR; cx.beginPath();
+  if (boy) { cx.moveTo(-12.5 * u, -79 * u); cx.quadraticCurveTo(-11 * u, -91 * u, 0, -91 * u); cx.quadraticCurveTo(11 * u, -91 * u, 12.5 * u, -79 * u);   // короткая стрижка с чёлкой
+    [[9, -84], [5, -81], [1, -85], [-3, -81], [-7, -85], [-10, -80]].forEach(([x, y]) => cx.lineTo(x * u, y * u)); cx.closePath(); cx.fill(); }
+  else { cx.moveTo(-12.5 * u, -78 * u); cx.quadraticCurveTo(-11 * u, -92 * u, 0, -91 * u); cx.quadraticCurveTo(11 * u, -92 * u, 12.5 * u, -78 * u);
+    cx.quadraticCurveTo(6 * u, -86 * u, -2 * u, -83 * u); cx.quadraticCurveTo(-8 * u, -84 * u, -12.5 * u, -78 * u); cx.fill();
+    cx.fillStyle = c1; cx.beginPath(); cx.ellipse(3 * u, -91 * u, 4 * u, 2.4 * u, -0.4, 0, 7); cx.ellipse(9 * u, -93 * u, 4 * u, 2.4 * u, 0.4, 0, 7); cx.fill(); }   // бантик
   // лицо
   cx.fillStyle = '#3a2340'; for (const ex of [-4.5, 4.5]) { cx.beginPath(); if (P.happy) { cx.lineWidth = 1.3 * u; cx.strokeStyle = '#3a2340'; cx.arc(ex * u, -75.5 * u, 2 * u, Math.PI * 1.1, Math.PI * 1.9); cx.stroke(); } else { cx.ellipse(ex * u, -76 * u, 1.7 * u, 2.1 * u, 0, 0, 7); cx.fill(); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc((ex + 0.6) * u, -76.8 * u, 0.6 * u, 0, 7); cx.fill(); cx.fillStyle = '#3a2340'; } }
   cx.fillStyle = 'rgba(255,120,150,.45)'; cx.beginPath(); cx.ellipse(-7.5 * u, -72 * u, 2.4 * u, 1.4 * u, 0, 0, 7); cx.ellipse(7.5 * u, -72 * u, 2.4 * u, 1.4 * u, 0, 0, 7); cx.fill();
   cx.strokeStyle = '#a3344f'; cx.lineWidth = 1.2 * u; cx.beginPath();
   if (P.sad) cx.arc(0, -68.5 * u, 2.2 * u, Math.PI * 1.15, Math.PI * 1.85); else cx.arc(0, -71.5 * u, 2.8 * u, Math.PI * 0.15, Math.PI * 0.85); cx.stroke();
+  if (boy) boyHead();
   if (wear.extra === 'crown') {                                                       // корона именинницы
     cx.fillStyle = '#ffc21a'; cx.strokeStyle = '#d18b00'; cx.lineWidth = 0.8 * u; cx.beginPath(); cx.moveTo(-7 * u, -88 * u);
     [[-7, -96], [-3.5, -91], [0, -98], [3.5, -91], [7, -96], [7, -88]].forEach(([x, y]) => cx.lineTo(x * u, y * u)); cx.closePath(); cx.fill(); cx.stroke();
     cx.fillStyle = '#ff4f9a'; cx.beginPath(); cx.arc(0, -92 * u, 1.2 * u, 0, 7); cx.fill();
   }
   cx.restore();
+}
+function boyClothes(top, bot) {                                                      // низ, потом верх (рубашка поверх пояса); рукава рисует arm()
+  const g = (c, y0, y1) => { const f = cx.createLinearGradient(0, y0 * u, 0, y1 * u); f.addColorStop(0, c[1]); f.addColorStop(1, c[0]); return f; };
+  cx.fillStyle = g(bot.c, -46, -30);
+  if (bot.id === 'swim') { rr(-10.5 * u, -46 * u, 21 * u, 9 * u, 3 * u); cx.fill(); cx.fillStyle = '#fff'; cx.fillRect(-10.5 * u, -42.5 * u, 21 * u, 1.4 * u); }
+  else { const L = bot.long ? 33 : 14; rr(-10.5 * u, -46 * u, 21 * u, 8 * u, 2 * u); cx.fill(); rr(-10.5 * u, -40 * u, 10 * u, L * u, 2 * u); cx.fill(); rr(0.5 * u, -40 * u, 10 * u, L * u, 2 * u); cx.fill();
+    if (bot.stripes) { cx.fillStyle = '#fff'; cx.fillRect(-10.5 * u, -40 * u, 1.6 * u, L * u); cx.fillRect(8.9 * u, -40 * u, 1.6 * u, L * u); } }
+  cx.fillStyle = g(top.c, -64, -43); cx.beginPath(); cx.moveTo(-10 * u, -64 * u); cx.lineTo(10 * u, -64 * u); cx.lineTo(11.5 * u, -43 * u); cx.lineTo(-11.5 * u, -43 * u); cx.closePath(); cx.fill();
+  if (top.id === 'jersey') { cx.fillStyle = '#fff'; cx.font = `bold ${8 * u}px sans-serif`; cx.textAlign = 'center'; cx.fillText('10', 0, -48 * u); }
+  if (top.id === 'hawaii') { cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(-4 * u, -64 * u); cx.lineTo(0, -57 * u); cx.lineTo(4 * u, -64 * u); cx.fill();
+    [[-6, -54, '#fff59d'], [5, -50, '#fff'], [-3, -47, '#fff'], [7, -58, '#fff59d']].forEach(([x, y, c]) => { cx.fillStyle = c; cx.beginPath(); cx.arc(x * u, y * u, 1.5 * u, 0, 7); cx.fill(); }); }
+  if (top.long) { cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(-4 * u, -64 * u); cx.lineTo(0, -55 * u); cx.lineTo(4 * u, -64 * u); cx.fill();   // рубашка и галстук под пиджаком
+    cx.fillStyle = '#c0392b'; cx.beginPath(); cx.moveTo(-1 * u, -63 * u); cx.lineTo(1 * u, -63 * u); cx.lineTo(1.4 * u, -55 * u); cx.lineTo(0, -53 * u); cx.lineTo(-1.4 * u, -55 * u); cx.fill();
+    cx.fillStyle = '#ffd36e'; [-50, -46].forEach(y => { cx.beginPath(); cx.arc(-1.5 * u, y * u, 0.8 * u, 0, 7); cx.fill(); }); }
+  if (top.sparkle) { cx.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 7; i++) if (Math.sin(G.t * 5 + i) > 0.2) { cx.beginPath(); cx.arc(Math.sin(i * 7.3) * 9 * u, (-46 - (i * 13 % 16)) * u, 0.9 * u, 0, 7); cx.fill(); } }
+}
+function boyHead() {                                                                  // очки и шапка — поверх лица
+  if (wear.beyes) { const e = item('beyes');
+    if (e.id === 'glasses') { cx.strokeStyle = '#333'; cx.lineWidth = 1 * u; for (const x of [-4.5, 4.5]) { cx.beginPath(); cx.arc(x * u, -76 * u, 3.3 * u, 0, 7); cx.stroke(); } cx.beginPath(); cx.moveTo(-1.2 * u, -76 * u); cx.lineTo(1.2 * u, -76 * u); cx.stroke(); }
+    else if (e.id === 'sun') { cx.fillStyle = '#151515'; rr(-9 * u, -79 * u, 7.5 * u, 5 * u, 2 * u); cx.fill(); rr(1.5 * u, -79 * u, 7.5 * u, 5 * u, 2 * u); cx.fill(); cx.fillRect(-1.5 * u, -78 * u, 3 * u, 1 * u); }
+    else { for (const x of [-4.5, 4.5]) { cx.fillStyle = 'rgba(177,107,255,.85)'; cx.beginPath(); for (let i = 0; i < 10; i++) { const r = (i % 2 ? 2 : 4.6) * u, a = -Math.PI / 2 + i * Math.PI / 5; cx.lineTo(x * u + Math.cos(a) * r, -76 * u + Math.sin(a) * r); } cx.closePath(); cx.fill(); }
+      cx.fillStyle = '#ffd36e'; cx.fillRect(-1.2 * u, -76.5 * u, 2.4 * u, 1 * u); } }
+  if (wear.bhead) { const h = item('bhead');
+    if (h.id === 'cap') { cx.fillStyle = h.c[0]; cx.beginPath(); cx.arc(0, -80 * u, 12.8 * u, Math.PI, 0); cx.fill(); cx.beginPath(); cx.ellipse(9 * u, -80.5 * u, 8 * u, 2.2 * u, 0, 0, 7); cx.fill(); }
+    else if (h.id === 'band') { cx.fillStyle = '#fff'; rr(-12.6 * u, -86 * u, 25.2 * u, 4.4 * u, 2 * u); cx.fill(); cx.fillStyle = h.c[1]; cx.fillRect(-12.6 * u, -84.4 * u, 25.2 * u, 1.3 * u); }
+    else { cx.fillStyle = h.c[0]; cx.beginPath(); cx.ellipse(0, -83 * u, 17 * u, 3.6 * u, 0, 0, 7); cx.fill(); cx.fillStyle = h.c[1]; cx.beginPath(); cx.arc(0, -84 * u, 11 * u, Math.PI, 0); cx.fill();
+      cx.fillStyle = '#7a5230'; cx.fillRect(-11 * u, -87 * u, 22 * u, 2.4 * u); } }
 }
 function baton(x, y, a, alpha = 1) {
   const b = item('baton'), L = 21 * u;
@@ -502,20 +542,22 @@ $('sndBtn').onclick = () => { audio(); ls('tw_sound', soundOn() ? '0' : '1'); if
 
 // ─── гардероб ───
 let tab = 'costume';
-const TABS = { costume: '👗 Костюм', baton: '🪄 Жезл', pompom: '🎀 Помпоны', extra: '👑 Ещё' };
+const TABS_G = { hero: '🧒 Герой', costume: '👗 Костюм', baton: '🪄 Жезл', pompom: '🎀 Помпоны', extra: '👑 Ещё' };
+const TABS_B = { hero: '🧒 Герой', btop: '👕 Верх', bbottom: '🩳 Низ', beyes: '👓 Очки', bhead: '🧢 Голова', baton: '🪄 Жезл', pompom: '🎀 Помпоны', extra: '👑 Ещё' };
 function shop() {
+  const TABS = wear.hero === 'boy' ? TABS_B : TABS_G; if (!TABS[tab]) tab = 'hero';
   $('shopStars').innerHTML = `<p>У тебя ⭐ ${starsN}</p>`;
   $('tabs').innerHTML = Object.entries(TABS).map(([k, n]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('');
   $('items').innerHTML = SHOP[tab].map(x => { const has = owned[tab].includes(x.id) || x.gift, on = wear[tab] === x.id;
-    const sw = x.id === 'crown' ? 'background:linear-gradient(#ffe27a,#f0a800)' : x.rainbow || x.c?.length > 2 ? 'background:linear-gradient(90deg,#ff5f6d,#ffc371,#5fe3a1,#5f9dff,#b16bff)' : `background:linear-gradient(135deg,${x.c[0]},${x.c[x.c.length - 1]})`;
-    return `<button class="it ${on ? 'on' : ''} ${!has && x.price > starsN ? 'no' : ''}" data-i="${x.id}"><i style="${sw}"></i>${esc(x.n)}<span>${on ? 'надето ✓' : has ? (x.gift && !owned[tab].includes(x.id) ? '🎁 подарок' : 'надеть') : `⭐ ${x.price}`}</span></button>`; }).join('');
+    const sw = x.e ? '' : x.id === 'crown' ? 'background:linear-gradient(#ffe27a,#f0a800)' : x.rainbow || x.c?.length > 2 ? 'background:linear-gradient(90deg,#ff5f6d,#ffc371,#5fe3a1,#5f9dff,#b16bff)' : `background:linear-gradient(135deg,${x.c[0]},${x.c[x.c.length - 1]})`;
+    return `<button class="it ${on ? 'on' : ''} ${!has && x.price > starsN ? 'no' : ''}" data-i="${x.id}">${x.e ? `<i class="em">${x.e}</i>` : `<i style="${sw}"></i>`}${esc(x.n)}<span>${on ? 'надето ✓' : has ? (x.gift && !owned[tab].includes(x.id) ? '🎁 подарок' : 'надеть') : `⭐ ${x.price}`}</span></button>`; }).join('');
   $('shop').hidden = false; $('home').hidden = true;
 }
 $('tabs').onclick = e => { const b = e.target.closest('button'); if (b) { tab = b.dataset.t; shop(); } };
 $('items').onclick = e => {
   const b = e.target.closest('.it'); if (!b) return; const x = SHOP[tab].find(i => i.id === b.dataset.i);
   if (!owned[tab].includes(x.id)) { if (!x.gift && x.price > starsN) return; if (!x.gift) { starsN -= x.price; bell(880, 0, 0.6, 0.1); } owned[tab].push(x.id); }
-  wear[tab] = tab === 'extra' && wear.extra === x.id ? '' : x.id; saveAll(); shop();                // корону можно снять
+  wear[tab] = OPTIONAL.includes(tab) && wear[tab] === x.id ? '' : x.id; saveAll(); shop();          // корону, очки и шапку можно снять
 };
 $('shopBtn').onclick = () => { audio(); shop(); };
 $('shopClose').onclick = () => { $('shop').hidden = true; home(); };

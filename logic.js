@@ -58,6 +58,17 @@ const SHOP = {
     { id: 'gold', n: 'Золотые', c: ['#ffc21a'], price: 60 }, { id: 'rainbow', n: 'Радужные', c: ['#ff5f6d', '#ffc371', '#5fe3a1', '#5f9dff', '#b16bff'], price: 90 },
     { id: 'silver', n: 'Серебряные', c: ['#dfe7f2', '#ffffff'], price: 120 }],
   extra: [{ id: 'crown', n: 'Корона именинницы', price: 0, gift: true }],
+  // герой: девочка или мальчик; у мальчика свои вещи (e — значок в гардеробе), жезлы, помпоны и корона — общие
+  hero: [{ id: 'girl', n: 'Девочка', e: '👧', price: 0 }, { id: 'boy', n: 'Мальчик', e: '👦', price: 0 }],
+  btop: [{ id: 'tee', n: 'Футболка', e: '👕', c: ['#2f6bff', '#7fb0ff'], price: 0 }, { id: 'jersey', n: 'Майка с номером 10', e: '🎽', c: ['#e63946', '#ff8a8a'], price: 30 },
+    { id: 'hawaii', n: 'Гавайская рубашка', e: '🌺', c: ['#ff6b6b', '#ffb199'], price: 60 }, { id: 'jacket', n: 'Пиджак', e: '🧥', c: ['#1f2d5c', '#3a4f8f'], price: 90, long: true },
+    { id: 'goldjacket', n: 'Золотой пиджак', e: '✨', c: ['#c98a00', '#ffe27a'], price: 180, long: true, sparkle: true }],
+  bbottom: [{ id: 'shorts', n: 'Шорты', e: '🩳', c: ['#2b3a67', '#4a5f9c'], price: 0 }, { id: 'swim', n: 'Плавки', e: '🩲', c: ['#00a6d6', '#7fe0ff'], price: 20 },
+    { id: 'pants', n: 'Брюки', e: '👖', c: ['#3b3b4f', '#5a5a73'], price: 50, long: true }, { id: 'sport', n: 'Спортивные штаны', e: '🏃', c: ['#7c4dff', '#b39dff'], price: 80, long: true, stripes: true }],
+  beyes: [{ id: 'glasses', n: 'Очки', e: '👓', c: ['#333333', '#888888'], price: 0 }, { id: 'sun', n: 'Солнечные очки', e: '🕶️', c: ['#111111', '#444444'], price: 40 },
+    { id: 'stars', n: 'Звёздные очки', e: '🌟', c: ['#b16bff', '#ffd36e'], price: 100 }],
+  bhead: [{ id: 'cap', n: 'Кепка', e: '🧢', c: ['#e63946', '#ff7b84'], price: 0 }, { id: 'band', n: 'Спортивная повязка', e: '🎗️', c: ['#ffffff', '#ff4f9a'], price: 30 },
+    { id: 'panama', n: 'Панама', e: '👒', c: ['#d4b483', '#f0dcb4'], price: 60 }],
 };
 globalThis.TW = { LEVELS, MIX, BEAT, flight, grade, points, medal, stars, judges, starHit, under, onBeat, SHOP };
 })();

@@ -60,11 +60,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* гардероб — сверху, чтобы внизу была видна девочка */
 #shop{align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 12px)}
 #shop .card{max-height:56vh}
-.tabs{display:flex;gap:6px;margin:4px 0 10px}
-.tabs button{flex:1;padding:9px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:700;font-size:14px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.tabs button{flex:1 1 22%;padding:9px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:700;font-size:14px}
 .tabs button.on{background:linear-gradient(90deg,#8b3dff,#d84fff);border-color:transparent}
 .it{display:flex;align-items:center;gap:10px;width:100%;margin:5px 0;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.07);text-align:left;font-weight:700;font-size:15px}
 .it i{width:30px;height:30px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.6)}
+.it i.em{border:0;font-style:normal;font-size:26px;line-height:30px;text-align:center}
 .it span{margin-left:auto;font-size:14px;color:var(--gold);white-space:nowrap}
 .it.on{border-color:#ffc21a;box-shadow:0 0 14px rgba(255,194,26,.35)}
 .it.no{opacity:.55}
